@@ -37,7 +37,7 @@
 
     upload: {
         'accept':       option.extensions ? '.' ~ option.extensions|join(',.') : '',
-        'data-url':     url('upload', {'handler': option.upload}),
+        'data-url':     url('upload', { 'handler': option.upload }, true),
         'id':           'fileupload-' ~ key,
         'name':         'files[]',
         'type':         'file',
@@ -72,7 +72,7 @@
             input: {
                 class:  'form-control',
                 id:     uid,
-                name:   key ~ '[' ~ aid ~ ']',
+                name:   name ~ '[' ~ aid ~ ']',
                 type:   'text',
                 value:  image[aid]|default(''),
             }

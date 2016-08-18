@@ -2,7 +2,7 @@
 
 namespace Bolt\Composer;
 
-use Bolt\Exception\LowlevelException;
+use Bolt\Exception\BootException;
 use Composer\Script\Event;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Finder\Finder;
@@ -96,6 +96,8 @@ class ScriptHandler
         $config = static::configureDir($event, 'config', 'app/config');
         $database = static::configureDir($event, 'database', 'app/database');
         $cache = static::configureDir($event, 'cache', 'app/cache');
+
+        static::configureGitIgnore($event);
 
         $config = [
             'paths' => [
@@ -192,6 +194,25 @@ class ScriptHandler
     }
 
     /**
+     * Optionally copy in Bolt's .gitignore file.
+     *
+     * @param Event $event
+     */
+    protected static function configureGitIgnore(Event $event)
+    {
+        $boltDir = sprintf('%s/bolt/bolt/', $event->getComposer()->getConfig()->get('vendor-dir'));
+        $question = sprintf(
+            '<info>Do you want to import the <comment>.gitignore</comment> file from <comment>%s</comment>] </info>',
+            $boltDir
+        );
+        $confirm = $event->getIO()->askConfirmation($question, true);
+        if ($confirm) {
+            $fs = new Filesystem();
+            $fs->copy($boltDir . '.gitignore', getcwd() . '/.gitignore', true);
+        }
+    }
+
+    /**
      * Gets the web directory either from configured application or composer's extra section/environment variable.
      *
      * If the web directory doesn't exist an error is emitted and null is returned.
@@ -230,7 +251,7 @@ class ScriptHandler
 
             $dir = $app['resources']->getPath($name);
             $dir = Path::makeRelative($dir, getcwd());
-        } catch (LowlevelException $e) {
+        } catch (BootException $e) {
             $dir = static::getOption($event, $name . '-dir', $default);
         }
 

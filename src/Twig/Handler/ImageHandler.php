@@ -30,29 +30,29 @@ class ImageHandler
     /**
      * Helper function to make a path to an image.
      *
-     * @param string         $filename Target filename
+     * @param string         $fileName Target filename
      * @param string|integer $width    Target width
      * @param string|integer $height   Target height
      * @param string         $crop     String identifier for cropped images
      *
      * @return string Image path
      */
-    public function image($filename = null, $width = null, $height = null, $crop = null)
+    public function image($fileName = null, $width = null, $height = null, $crop = null)
     {
         if ($width || $height) {
             // You don't want the image, you just want a thumbnail.
-            return $this->thumbnail($filename, $width, $height, $crop);
+            return $this->thumbnail($fileName, $width, $height, $crop);
         }
 
         // After v1.5.1 we store image data as an array
-        if (is_array($filename)) {
-            $filename = isset($filename['filename']) ? $filename['filename'] : $filename['file'];
+        if (is_array($fileName)) {
+            $fileName = isset($fileName['filename']) ? $fileName['filename'] : (isset($fileName['file']) ? $fileName['file'] : '');
         }
 
         $image = sprintf(
             '%s%s',
             $this->app['resources']->getUrl('files'),
-            Lib::safeFilename($filename)
+            Lib::safeFilename($fileName)
         );
 
         return $image;
@@ -61,20 +61,20 @@ class ImageHandler
     /**
      * Get an image.
      *
-     * @param string $filename
+     * @param string $fileName
      * @param string $safe
      *
      * @return \Bolt\Filesystem\Handler\ImageInterface
      */
-    public function imageInfo($filename, $safe)
+    public function imageInfo($fileName, $safe)
     {
-        if ($filename instanceof ImageInterface) {
-            return $filename;
+        if ($fileName instanceof ImageInterface) {
+            return $fileName;
         } elseif ($safe) {
             return null;
         }
 
-        $image = $this->app['filesystem']->getFile('files://' . $filename, new NullableImage());
+        $image = $this->app['filesystem']->getFile('files://' . $fileName, new NullableImage());
 
         return $image;
     }
@@ -136,7 +136,7 @@ class ImageHandler
      * Helper function to show an image on a rendered page.
      *
      * Set width or height parameter to '0' for proportional scaling.
-     * Set them both to '0' to get original width and height.
+     * Set them both to null (or not at all) to get the default size from config.yml.
      *
      * Example: {{ content.image|showimage(320, 240) }}
      * Example: {{ showimage(content.image, 320, 240) }}

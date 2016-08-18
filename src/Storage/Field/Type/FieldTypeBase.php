@@ -1,8 +1,11 @@
 <?php
+
 namespace Bolt\Storage\Field\Type;
 
 use Bolt\Storage\EntityManager;
 use Bolt\Storage\Field\FieldInterface;
+use Bolt\Storage\Field\Sanitiser\SanitiserAwareInterface;
+use Bolt\Storage\Field\Sanitiser\WysiwygAwareInterface;
 use Bolt\Storage\Mapping\ClassMetadata;
 use Bolt\Storage\Query\QueryInterface;
 use Bolt\Storage\QuerySet;
@@ -71,10 +74,17 @@ abstract class FieldTypeBase implements FieldTypeInterface, FieldInterface
      */
     public function persist(QuerySet $queries, $entity)
     {
+        $attribute = $this->getMappingAttribute();
         $key = $this->mapping['fieldname'];
+
         $qb = &$queries[0];
-        $valueMethod = 'serialize' . ucfirst($key);
+        $valueMethod = 'serialize' . ucfirst($attribute);
         $value = $entity->$valueMethod();
+
+        if ($this instanceof SanitiserAwareInterface && is_string($value)) {
+            $isWysiwyg = $this instanceof WysiwygAwareInterface;
+            $value = $this->getSanitiser()->sanitise($value, $isWysiwyg);
+        }
 
         $type = $this->getStorageType();
 
@@ -123,6 +133,21 @@ abstract class FieldTypeBase implements FieldTypeInterface, FieldInterface
     }
 
     /**
+     * Reads the current value of the field from an entity and returns value
+     *
+     * @param $entity
+     * @return mixed
+     */
+    public function get($entity)
+    {
+        $key = $this->mapping['fieldname'];
+        $valueMethod = 'get' . ucfirst($key);
+        $value = $entity->$valueMethod();
+
+        return $value;
+    }
+
+    /**
      * {@inheritdoc}
      */
     public function present($entity)
@@ -154,6 +179,20 @@ abstract class FieldTypeBase implements FieldTypeInterface, FieldInterface
     public function getStorageOptions()
     {
         return [];
+    }
+
+    /**
+     * Gets the entity attribute name to be used for reading / persisting
+     *
+     * @return string
+     */
+    public function getMappingAttribute()
+    {
+        if (isset($this->mapping['attribute'])) {
+            return $this->mapping['attribute'];
+        }
+
+        return $this->mapping['fieldname'];
     }
 
     /**

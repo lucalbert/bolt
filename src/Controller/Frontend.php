@@ -7,7 +7,6 @@ use Bolt\Asset\File\Stylesheet;
 use Bolt\Asset\Snippet\Snippet;
 use Bolt\Asset\Target;
 use Bolt\Helpers\Input;
-use Bolt\Pager;
 use Bolt\Response\BoltResponse;
 use Bolt\Translation\Translator as Trans;
 use Silex\ControllerCollection;
@@ -22,7 +21,7 @@ use utilphp\util;
  * This file acts as a grouping for the default front-end controllers.
  *
  * For overriding the default behavior here, please reference
- * https://docs.bolt.cm/3.0/templates/templates-routes#routing or the routing.yml
+ * https://docs.bolt.cm/templates/templates-routes#routing or the routing.yml
  * file in your configuration.
  */
 class Frontend extends ConfigurableBase
@@ -84,6 +83,22 @@ class Frontend extends ConfigurableBase
         $this->app['stopwatch']->stop('bolt.frontend.before');
 
         return null;
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function after(Request $request, Response $response)
+    {
+        if ($this->session()->isStarted()) {
+            $response->setPrivate();
+        } else {
+            $sharedMaxAge = $this->getOption('general/caching/duration', 10) * 3600;
+            $response
+                ->setPublic()
+                ->setSharedMaxAge($sharedMaxAge)
+            ;
+        }
     }
 
     /**
@@ -432,7 +447,7 @@ class Frontend extends ConfigurableBase
 
         $globals = [
             'records'      => $result['results'],
-            $context       => $result['query']['use_q'],
+            $context       => $result['query']['sanitized_q'],
             'searchresult' => $result,
         ];
 

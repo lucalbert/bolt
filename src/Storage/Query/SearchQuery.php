@@ -3,6 +3,7 @@
 namespace Bolt\Storage\Query;
 
 use Bolt\Exception\QueryParseException;
+use Doctrine\DBAL\Query\Expression\CompositeExpression;
 use Doctrine\DBAL\Query\QueryBuilder;
 
 /**
@@ -10,7 +11,7 @@ use Doctrine\DBAL\Query\QueryBuilder;
  * filtering system used in the SelectQuery class. The main difference is
  * the addition of weighting, which is driven by documented here:.
  *
- *  @link https://docs.bolt.cm/3.0/templates/content-search
+ *  @link https://docs.bolt.cm/templates/content-search
  *
  *  The resulting QueryBuilder object is then passed through to the individual
  *  field handlers where they can perform value transformations.
@@ -20,9 +21,15 @@ use Doctrine\DBAL\Query\QueryBuilder;
 class SearchQuery extends SelectQuery
 {
     protected $search;
+    /** @var SearchConfig */
+    protected $config;
 
     /**
-     * @param QueryBuilder $qb
+     * Constructor.
+     *
+     * @param QueryBuilder         $qb
+     * @param QueryParameterParser $parser
+     * @param SearchConfig         $config
      */
     public function __construct(QueryBuilder $qb, QueryParameterParser $parser, SearchConfig $config)
     {
@@ -47,7 +54,7 @@ class SearchQuery extends SelectQuery
      *
      * @param array $params
      */
-    public function setParameters($params)
+    public function setParameters(array $params)
     {
         $this->params = $params;
     }
@@ -117,10 +124,11 @@ class SearchQuery extends SelectQuery
     public function getWhereExpression()
     {
         if (!count($this->filters)) {
-            return;
+            return null;
         }
 
         $expr = $this->qb->expr()->orX();
+        /** @var Filter $filter */
         foreach ($this->filters as $filter) {
             $expr = $expr->add($filter->getExpression());
         }

@@ -10,6 +10,7 @@ use Bolt\Session\OptionsBag;
 use Bolt\Session\Serializer\NativeSerializer;
 use Bolt\Session\SessionListener;
 use Bolt\Session\SessionStorage;
+use GuzzleHttp\Psr7;
 use GuzzleHttp\Psr7\Uri;
 use Silex\Application;
 use Silex\ServiceProviderInterface;
@@ -105,11 +106,9 @@ class SessionServiceProvider implements ServiceProviderInterface
      */
     public function configure(Application $app)
     {
-        $app['session.options'] = [
-            'name'            => 'bolt_session_',
+        $app['session.options'] = $app['config']->get('general/session', []) + [
+            'name'            => 'bolt_session',
             'restrict_realm'  => true,
-            'save_handler'    => 'filesystem',
-            'save_path'       => 'cache://.sessions',
             'cookie_lifetime' => $app['config']->get('general/cookies_lifetime'),
             'cookie_path'     => $app['resources']->getUrl('root'),
             'cookie_domain'   => $app['config']->get('general/cookies_domain'),
@@ -165,8 +164,16 @@ class SessionServiceProvider implements ServiceProviderInterface
                     }
                 }
 
+                // @deprecated backwards compatibility:
                 if (isset($app['session.storage.options'])) {
                     $options->add($app['session.storage.options']);
+                }
+
+                // PHP's native C code accesses filesystem with different permissions than userland code.
+                // If php.ini is using the default (files) handler, use ours instead to prevent this problem.
+                if ($options->get('save_handler') === 'files') {
+                    $options->set('save_handler', 'filesystem');
+                    $options->set('save_path', 'cache://.sessions');
                 }
 
                 $options->add($app['session.options']);
@@ -227,6 +234,22 @@ class SessionServiceProvider implements ServiceProviderInterface
                         $conn['persistent'] ?: false,
                         $conn['weight'] ?: 0,
                         $conn['timeout'] ?: 1
+                    );
+                }
+
+                return $memcache;
+            }
+        );
+
+        $app['session.handler_factory.backing_memcached'] = $app->protect(
+            function ($connections) {
+                $memcache = new \Memcached();
+
+                foreach ($connections as $conn) {
+                    $memcache->addServer(
+                        $conn['host'] ?: 'localhost',
+                        $conn['port'] ?: 11211,
+                        $conn['weight'] ?: 0
                     );
                 }
 
@@ -341,9 +364,13 @@ class SessionServiceProvider implements ServiceProviderInterface
             }
         } elseif (isset($options['save_path'])) {
             foreach (explode(',', $options['save_path']) as $conn) {
-                $conn = new ParameterBag($conn);
-                $conn->set('uri', new Uri($conn));
-                $toParse[] = $conn;
+                $uri = new Uri($conn);
+
+                $connBag = new ParameterBag();
+                $connBag->set('uri', $uri);
+                $connBag->add(Psr7\parse_query($uri->getQuery()));
+
+                $toParse[] = $connBag;
             }
         }
 

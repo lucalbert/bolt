@@ -45,7 +45,7 @@ class QuerySet extends \ArrayIterator
                 if ($result === null) {
                     $result = $query->execute();
                     if ($query->getType() === 3) {
-                        $this->lastInsertId = $query->getConnection()->lastInsertId();
+                        $this->setLastInsertId($query);
                     }
                     foreach ($this->resultCallbacks as $callback) {
                         $callback($query, $result, $this->getParentId());
@@ -83,6 +83,27 @@ class QuerySet extends \ArrayIterator
     public function getInsertId()
     {
         return $this->lastInsertId;
+    }
+
+    /**
+     * @TODO Temporary workaround for PostgreSQL databases that don't use a sequence.
+     *
+     * @param QueryBuilder $query
+     */
+    private function setLastInsertId(QueryBuilder $query)
+    {
+        $seq = null;
+        if ($query->getConnection()->getDatabasePlatform()->getName() === 'postgresql') {
+            $sequences = $query->getConnection()->getSchemaManager()->listSequences();
+            $desiredSeq = $query->getQueryPart('from')['table'] . '_id_seq';
+            foreach ($sequences as $sequence) {
+                if ($desiredSeq === $sequence->getName()) {
+                    $seq = $desiredSeq;
+                    break;
+                }
+            }
+        }
+        $this->lastInsertId = $query->getConnection()->lastInsertId($seq);
     }
 
     /**

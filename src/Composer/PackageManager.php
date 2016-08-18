@@ -7,6 +7,7 @@ use Bolt\Extension\ResolvedExtension;
 use Bolt\Filesystem\Exception\ParseException;
 use Bolt\Filesystem\Handler\JsonFile;
 use Bolt\Translation\Translator as Trans;
+use Composer\Package\CompletePackageInterface;
 use GuzzleHttp\Exception\ClientException;
 use GuzzleHttp\Exception\RequestException;
 use GuzzleHttp\Exception\ServerException;
@@ -35,9 +36,6 @@ class PackageManager
     public function __construct(Application $app)
     {
         $this->app = $app;
-
-        // Set composer environment variables
-        putenv('COMPOSER_HOME=' . $this->app['resources']->getPath('cache/composer'));
 
         $this->setup();
     }
@@ -138,6 +136,19 @@ class PackageManager
     }
 
     /**
+     * Find which packages cause the given package to be installed.
+     *
+     * @param string $packageName
+     * @param string $constraint
+     *
+     * @return
+     */
+    public function dependsPackage($packageName, $constraint)
+    {
+        return $this->app['extend.action']['depends']->execute($packageName, $constraint);
+    }
+
+    /**
      * Dump fresh autoloader.
      */
     public function dumpAutoload()
@@ -153,6 +164,19 @@ class PackageManager
     public function installPackages()
     {
         return $this->app['extend.action']['install']->execute();
+    }
+
+    /**
+     * Find which packages prevent the given package from being installed.
+     *
+     * @param string $packageName
+     * @param string $constraint
+     *
+     * @return
+     */
+    public function prohibitsPackage($packageName, $constraint)
+    {
+        return $this->app['extend.action']['prohibits']->execute($packageName, $constraint);
     }
 
     /**
@@ -246,7 +270,9 @@ class PackageManager
         // Installed
         $installed = $this->app['extend.action']['show']->execute('installed');
         foreach ($installed as $composerPackage) {
-            $package = Package::createFromComposerPackage($composerPackage['package']);
+            /** @var CompletePackageInterface $composerPackage */
+            $composerPackage = $composerPackage['package'];
+            $package = Package::createFromComposerPackage($composerPackage);
             $name = $package->getName();
             $extension = $this->app['extensions']->getResolved($name);
 
@@ -271,6 +297,7 @@ class PackageManager
             $package->setTitle($title);
             $package->setReadmeLink($readme);
             $package->setConfigLink($config);
+            $package->setRepositoryLink($composerPackage->getSourceUrl());
             $package->setConstraint($constraint);
             $package->setValid($valid);
             $package->setEnabled($enabled);
@@ -392,7 +419,7 @@ class PackageManager
         }
 
         try {
-            $this->app['guzzle.client']->head($uri, ['query' => $query, 'exceptions' => true, 'connect_timeout' => 5, 'timeout' => 10]);
+            $this->app['guzzle.client']->head($uri, ['query' => $query, 'exceptions' => true, 'connect_timeout' => 10, 'timeout' => 30]);
 
             $this->app['extend.online'] = true;
         } catch (ClientException $e) {

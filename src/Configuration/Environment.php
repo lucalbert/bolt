@@ -3,6 +3,7 @@
 namespace Bolt\Configuration;
 
 use Bolt\Cache;
+use Bolt\Composer\Action\DumpAutoload;
 use Bolt\Exception\PackageManagerException;
 use Pimple;
 use Symfony\Component\Filesystem\Exception\IOException;
@@ -30,6 +31,9 @@ class Environment
     /** @var string */
     protected $boltVersion;
 
+    /** @var bool */
+    private $versionChange;
+
     /**
      * Constructor.
      *
@@ -47,6 +51,16 @@ class Environment
         $this->cache = $cache;
         $this->actions = $actions;
         $this->boltVersion = $boltVersion;
+    }
+
+    /**
+     * Has a Bolt version change been detected.
+     *
+     * @return boolean
+     */
+    public function hasVersionChange()
+    {
+        return (bool) $this->versionChange;
     }
 
     /**
@@ -112,18 +126,19 @@ class Environment
      */
     protected function checkCacheVersion()
     {
-        $file = $this->cache->getDirectory() . '/.version';
+        $fileName = $this->getVersionFileName();
 
-        if (!file_exists($file)) {
+        if (!file_exists($fileName)) {
             return false;
         }
 
         $version = md5($this->boltVersion);
-        $cached  = file_get_contents($file);
+        $cached  = file_get_contents($fileName);
 
         if ($version === $cached) {
             return true;
         }
+        $this->versionChange = true;
 
         return false;
     }
@@ -136,7 +151,9 @@ class Environment
         $cwd = getcwd();
 
         try {
-            $this->actions['autoload']->execute();
+            /** @var DumpAutoload $autoload */
+            $autoload = $this->actions['autoload'];
+            $autoload->execute();
         } catch (PackageManagerException $e) {
             // Write access is potentially disabled
         }
@@ -150,6 +167,11 @@ class Environment
     protected function updateCacheVersion()
     {
         $version = md5($this->boltVersion);
-        file_put_contents($this->cache->getDirectory() . '/.version', $version);
+        file_put_contents($this->getVersionFileName(), $version);
+    }
+
+    private function getVersionFileName()
+    {
+        return dirname(dirname($this->cache->getDirectory())) . '/.version';
     }
 }

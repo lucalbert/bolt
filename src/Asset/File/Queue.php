@@ -115,11 +115,17 @@ class Queue implements QueueInterface
         if ($asset->getZone() !== Zone::get($request)) {
             return;
         } elseif ($asset->isLate()) {
-            $this->injector->inject($asset, Target::END_OF_BODY, $response);
-        } elseif ($asset->getType() === 'stylesheet') {
-            $this->injector->inject($asset, Target::BEFORE_CSS, $response);
-        } elseif ($asset->getType() === 'javascript') {
-            $this->injector->inject($asset, Target::AFTER_JS, $response);
+            if ($asset->getLocation() === null) {
+                $location = Target::END_OF_BODY;
+            } else {
+                $location = $asset->getLocation();
+            }
+        } elseif ($asset->getLocation() !== null) {
+            $location = $asset->getLocation();
+        } else {
+            $location = Target::END_OF_HEAD;
         }
+
+        $this->injector->inject($asset, $location, $response);
     }
 }

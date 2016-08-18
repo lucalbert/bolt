@@ -1,6 +1,235 @@
-Changelog for Bolt
-==================
+Changelog for Bolt 3.x
+======================
 
+Bolt 3.2-dev
+-----------
+
+- Added: Add support for separate entity attribute, versus db column names. [#5608](https://github.com/bolt/bolt/pull/5608)
+- Added: debug_error_use_profiler option to replace Whoops! with Symfony Profiler page [#5615](https://github.com/bolt/bolt/pull/5615)
+- Added: Exception controller to display error pages rendered from Twig templates [#5615](https://github.com/bolt/bolt/pull/5615)
+- Added: Lazy loading service provider for EntityManager [#5615](https://github.com/bolt/bolt/pull/5615)
+- Added: Lazy loading service provider for SchemaManager [#5615](https://github.com/bolt/bolt/pull/5615)
+- Added: Symfony HTTP Cache for request caching (replaces Doctrine file cache use) [#5615](https://github.com/bolt/bolt/pull/5615)
+- Added: Twig, Doctrine, Bolt & request caching done per-environment, and per service [#5615](https://github.com/bolt/bolt/pull/5615)
+- Fixed: Database is no longer initialised prior to boot
+- Fixed: System checks now run at start of request cycle
+- Removed: Internal use of LowlevelChecks (See Validator)
+- Removed: Internal use of LowlevelException & LowlevelDatabaseException (See BootException)
+
+Bolt 3.1.0 beta 2
+-----------------
+
+Released 2016-08-11. Notable changes:
+
+ - Changed: Modify `checkFirstUser` to check for a valid logged in user, to prevent expensive test. [#5649](https://github.com/bolt/bolt/pull/5649)
+ - Fixed: Function names can't be used in import prior to PHP 5.6 [#5642](https://github.com/bolt/bolt/pull/5642)
+ - Updated: Updating JS and CSS dependencies. [#5653](https://github.com/bolt/bolt/pull/5653)
+ - … Plus all changes listed under 3.0.12
+
+Bolt 3.1.0 beta 1
+-----------------
+
+Released 2016-08-04. Notable changes:
+
+- Fixed: Installation of specific extension version [#5635](https://github.com/bolt/bolt/pull/5635)
+- Fixed: Disabling news feed in backend [#5544](https://github.com/bolt/bolt/pull/5544)
+- Fixed: Display of "last seen" user date/time [#5547](https://github.com/bolt/bolt/pull/5547)
+- Added: Automatic Translation Inclusion for Extensions [#5292](https://github.com/bolt/bolt/pull/5292)
+- Added: Allow extra plugins for Ckeditor [#5342](https://github.com/bolt/bolt/pull/5342)
+- Added: Setting Extensions Composer options [#5571](https://github.com/bolt/bolt/pull/5571)
+- Added: Nut command to enable, disable, and list details for a user [#5483](https://github.com/bolt/bolt/pull/5483)
+- Added: Add `--enable` option to Nut `user:create` [#5483](https://github.com/bolt/bolt/pull/5483)
+- Added: Better sanitization of content on save. [#5611](https://github.com/bolt/bolt/pull/5611)
+
+Bolt 3.0.x
+-----------
+
+ - Fixed: Uploading to `themes/` folder in backend. [#5679](https://github.com/bolt/bolt/pull/5679)
+
+Bolt 3.0.12
+-----------
+
+Released 2016-08-10. Notable changes:
+
+ - Added: Add scripts to run grunt without global [#5552](https://github.com/bolt/bolt/pull/5552)
+ - Added: Add support for missing `skip_uses` parameter in `{{ fields() }}` [#5609](https://github.com/bolt/bolt/pull/5609)
+ - Added: Create custom exception for invalid repo, and throw this when accessed [#5568](https://github.com/bolt/bolt/pull/5568)
+ - Added: Session can now be configured via config.yml and custom handler/path in ini is not overridden [#5563](https://github.com/bolt/bolt/pull/5563)
+ - Change: Remove the Foreign Key Constraint properties from diffs when `supportsForeignKeyConstraints()` is `false` [#5550](https://github.com/bolt/bolt/pull/5550)
+ - Change: Set `searchable: true` for Showcases. No reason why they shouldn't be. [#5617](https://github.com/bolt/bolt/pull/5617)
+ - Change: Set a flash and redirect to to dashboard if ContentType doesn't exist fetching repository [#5569](https://github.com/bolt/bolt/pull/5569)
+ - Change: Use URL generator where appropriate [#5577](https://github.com/bolt/bolt/pull/5577)
+ - Docs: PHPDoc fixes [#5645](https://github.com/bolt/bolt/pull/5645), [#5647](https://github.com/bolt/bolt/pull/5647), [#5660](https://github.com/bolt/bolt/pull/5660)
+ - Fixed: Add index on slug in taxonomy table [#5597](https://github.com/bolt/bolt/pull/5597)
+ - Fixed: Address init failures in repeaters [#5631](https://github.com/bolt/bolt/pull/5631)
+ - Fixed: Always return something in getTitleColumnName [#5598](https://github.com/bolt/bolt/pull/5598)
+ - Fixed: Be very select about extension autoloader error/exception emitting [#5565](https://github.com/bolt/bolt/pull/5565)
+ - Fixed: Bug in Imagefield with attrib would break repeater fields. [#5665](https://github.com/bolt/bolt/pull/5665)
+ - Fixed: Bugfix for HTML fields inside repeaters [#5639](https://github.com/bolt/bolt/pull/5639)
+ - Fixed: Change link to taxonomies documentation [#5618](https://github.com/bolt/bolt/pull/5618)
+ - Fixed: Filesystem session handler's garbage collection [#5633](https://github.com/bolt/bolt/pull/5633)
+ - Fixed: Fix attempts to access values via $this->values in storage [#5593](https://github.com/bolt/bolt/pull/5593)
+ - Fixed: Fix backend publish process quirks ([#5085](https://github.com/bolt/bolt/pull/5085)) [#5610](https://github.com/bolt/bolt/pull/5610)
+ - Fixed: Fix bidirectional relations and relations affecting each other [#5641](https://github.com/bolt/bolt/pull/5641)
+ - Fixed: Fix issue with multi-value value selects [#5632](https://github.com/bolt/bolt/pull/5632)
+ - Fixed: Fix two issues with deferred widgets. [#5643](https://github.com/bolt/bolt/pull/5643)
+ - Fixed: Fixing a link in the base-2016 theme [#5627](https://github.com/bolt/bolt/pull/5627)
+ - Fixed: Get correct path to compare in 'current' filter, when Bolt is in a subfolder/ [#5620](https://github.com/bolt/bolt/pull/5620)
+ - Fixed: Incoming relations must be checked with both `contenttype` and `id`. [#5637](https://github.com/bolt/bolt/pull/5637)
+ - Fixed: Memcached and Redis session handler and realm getting appended multiple times [#5662](https://github.com/bolt/bolt/pull/5662)
+ - Fixed: Redis session handler [#5664](https://github.com/bolt/bolt/pull/5664)
+ - Fixed: Remove the last references to `listcontent` [#5634](https://github.com/bolt/bolt/pull/5634)
+ - Fixed: Replacing deprecated `localdate` with `localedatetime`. [#5621](https://github.com/bolt/bolt/pull/5621)
+ - Fixed: Set relations indexes to be multi column indexes [#5602](https://github.com/bolt/bolt/pull/5602)
+ - Fixed: Skip schema check only on `_wdt` (profiler) & `dbupdate` routes [#5570](https://github.com/bolt/bolt/pull/5570)
+ - Fixed: Tweak changelog notes about session and port redis handler fix [#5664](https://github.com/bolt/bolt/pull/5664)
+ - Folder Handling doesn't need parent value concatenated [#5582](https://github.com/bolt/bolt/pull/5582)
+ - Updated: GitHub hints in `.github/` [#5661](https://github.com/bolt/bolt/pull/5661)
+ - Updated: Update features section in CONTRIBUTING.md [#5536](https://github.com/bolt/bolt/pull/5536)
+ - Updated: Updating the version of Jquery that's used with `add_jquery` in the frontend. [#5663](https://github.com/bolt/bolt/pull/5663)
+
+Bolt 3.0.11
+-----------
+
+Released 2016-07-19. Notable changes:
+
+ - Update: [SECURITY] Updated bundled [Guzzle to 5.3.1](https://github.com/guzzle/guzzle/releases/tag/6.2.1) that mitigates [Httpoxy](https://httpoxy.org/) (CVE-2016-5385)
+ - Update: [SECURITY] Updated [Composer to 1.2.0](https://github.com/composer/composer/releases/tag/1.2.0), which mitigates [Httpoxy](https://httpoxy.org/) (CVE-2016-5385)
+ - Added: Add Google Maps API key option [#5505](https://github.com/bolt/bolt/pull/5505)
+ - Fixed: Enforce relative schema on Twig `{{ url() }}` calls [#5497](https://github.com/bolt/bolt/pull/5497)
+ - Fixed: Ability to disable the news feed [#5544](https://github.com/bolt/bolt/pull/5544)
+ - Fixed: Enable use of repeaters inside Templatefields [#5542](https://github.com/bolt/bolt/pull/5542)
+
+Bolt 3.0.10
+-----------
+
+Released 2016-07-14. Notable changes:
+
+ - Added: Allow callables to be registered as repository classes [#5523](https://github.com/bolt/bolt/pull/5523)
+ - Change: Improve logic of hydration events on create [#5521](https://github.com/bolt/bolt/pull/5521)
+ - Change: Refactor the hydration event to use an ArrayObject [#5518](https://github.com/bolt/bolt/pull/5518)
+ - Fixed: Cant open readme from extension on WINDOWS [#5501](https://github.com/bolt/bolt/pull/5501)
+ - Fixed: Check isallowed on new page buttons [#5529](https://github.com/bolt/bolt/pull/5529)
+ - Fixed: Ensure the id is unique in repeater fields [#5526](https://github.com/bolt/bolt/pull/5526)
+ - Fixed: Fix comment on default image sizing [#5528](https://github.com/bolt/bolt/pull/5528)
+ - Fixed: Tokenise PHP version string to remove `-extra` on Debian [#5524](https://github.com/bolt/bolt/pull/5524)
+ - Update: Updating dependencies for base-2016. [#5520](https://github.com/bolt/bolt/pull/5520)
+
+Bolt 3.0.9
+----------
+
+Released 2016-07-06. Notable changes:
+
+ - Added: Add option for google maps api key [#5492](https://github.com/bolt/bolt/pull/5492)
+ - Added: Allow pre-hydration data to be modified in event [#5510](https://github.com/bolt/bolt/pull/5510)
+ - Change: [Travis] Disable Composer install test [#5514](https://github.com/bolt/bolt/pull/5514)
+ - Change: [Travis] Drop installation of language packs & Codeception failures [#5498](https://github.com/bolt/bolt/pull/5498)
+ - Fixed: "Invalid Version String" on Ext Update Check [#5516](https://github.com/bolt/bolt/pull/5516)
+ - Fixed: Contenttype vs. Table name "_" and "-" [#5363](https://github.com/bolt/bolt/pull/5363)
+ - Fixed: Initialize `slugFields` variable [#5503](https://github.com/bolt/bolt/pull/5503)
+ - Fixed: Lock lstrojny/phpunit-function-mocker to 0.3.0 for PHP 5.5 support [#5493](https://github.com/bolt/bolt/pull/5493)
+ - Fixed: Don't hide exceptions when adding user with Nut [#5481](https://github.com/bolt/bolt/pull/5481)
+
+Bolt 3.0.8
+----------
+
+Released 2016-06-22. Notable changes:
+
+ - Fix: Postgres Fix: add missing second parameter to `string_agg` call [#5467](https://github.com/bolt/bolt/pull/5467)
+ - Fix: Various fixes for z-index positioning of modals. [#5459](https://github.com/bolt/bolt/pull/5459), [#5461](https://github.com/bolt/bolt/pull/5461), [#5475](https://github.com/bolt/bolt/pull/5475)
+ - Fix: Hotfix filesystem plugins. [#5450](https://github.com/bolt/bolt/pull/5450)
+ - Fix: Some Composer fixes. [#5472](https://github.com/bolt/bolt/pull/5472)
+
+Bolt 3.0.7
+----------
+
+Released 2016-06-17. Notable changes:
+
+ - Fixed: Mea culpa! Use `$zindex-modal` for the `.bootbox` z-index. (Prevents Modal dialogs from being not dismissable.) [#5459](https://github.com/bolt/bolt/pull/5459)
+ - Fixed: Set correct mount point / namespace in AdapterPlugin before plugin methods executes. [#5449](https://github.com/bolt/bolt/pull/5449) / [#5450](https://github.com/bolt/bolt/pull/5450)
+
+Bolt 3.0.6
+----------
+
+Released 2016-06-15. Notable changes:
+
+ - Added: Add an ability to delete a record from the 'mobile' version of the Bolt backend [#5444](https://github.com/bolt/bolt/pull/5444)
+ - Change: Move the assignment of COMPOSER_HOME to BaseAction::getComposer() [#5424](https://github.com/bolt/bolt/pull/5424)
+ - Fix: "Select all" button was visible when taxonomy `multiple: false` was set for category behaviour [#5443](https://github.com/bolt/bolt/pull/5443)
+ - Fix: Be more user friendly with file manager edit failures [#5447](https://github.com/bolt/bolt/pull/5447)
+ - Fix: BUG Select all button visible when taxanomy multiple set to false for category behaviour [#5437](https://github.com/bolt/bolt/pull/5437)
+ - Fix: Clicking on 'tags with spaces' wouldn't work. [#5431](https://github.com/bolt/bolt/pull/5431)
+ - Fix: Extensions: Don't evaluate an empty constraint [#5457](https://github.com/bolt/bolt/pull/5457)
+ - Fix: Fix the path for files, when found in Omnisearch. [#5422](https://github.com/bolt/bolt/pull/5422)
+ - Fix: Fixed `blur` in 'select all' and 'select none' in taxonomies. [#5452](https://github.com/bolt/bolt/pull/5452)
+ - Fix: Fixed invalid ExtensionInterface namespace in Controller Resolver [#5434](https://github.com/bolt/bolt/pull/5434)
+ - Fix: Fixing z-index for modals. [#5455](https://github.com/bolt/bolt/pull/5455)
+ - Fix: Repeaters: Fix duplicate button functionality in repeater groups [#5442](https://github.com/bolt/bolt/pull/5442)
+ - Fix: Repeaters: Fix hyphenated field names for repeating fields [#5436](https://github.com/bolt/bolt/pull/5436)
+ - Fix: Theme: fix wrong link to edit template in base-2016 theme [#5445](https://github.com/bolt/bolt/pull/5445)
+ - Update: French and Russion translations updated.
+
+Bolt 3.0.5
+----------
+
+Released 2016-06-08. Notable changes:
+
+ - Added: Optionally copy in Bolt's .gitignore file on `composer create-project` [#5420](https://github.com/bolt/bolt/pull/5420)
+ - Added: Refinements for content fetching [#5401](https://github.com/bolt/bolt/pull/5401)
+ - Added: Setting 'provided_link', allowing for more flexibility in "branding" [#5377](https://github.com/bolt/bolt/pull/5377)
+ - Changed: Remove version numbers from doc links to be more future-proof [#5416](https://github.com/bolt/bolt/pull/5416)
+ - Fixed: Don't trigger an exception on PostgreSQL if no table sequence is defined [#5412](https://github.com/bolt/bolt/pull/5412)
+ - Fixed: File asset priority & location [#5415](https://github.com/bolt/bolt/pull/5415)
+ - Fixed: Fix for lookup failures on hyphenated data names [#5399](https://github.com/bolt/bolt/pull/5399)
+ - Fixed: Fix for remaining doc links pointing to the incorrect version [#5414](https://github.com/bolt/bolt/pull/5414)
+ - Fixed: Handle site root directory moves on Sqlite [#5393](https://github.com/bolt/bolt/pull/5393)
+ - Fixed: MySQL error in select fields populated from content types [#5407](https://github.com/bolt/bolt/pull/5407)
+ - Fixed: Placing the delay parameter for Omnisearch to reduce the amount of cancelled XHRs. [#5408](https://github.com/bolt/bolt/pull/5408)
+ - Fixed: Set configured schemes from routing.yml [#5409](https://github.com/bolt/bolt/pull/5409)
+ - Fixed: Use the correct version for link to the docs [#5413](https://github.com/bolt/bolt/pull/5413)
+ - Travis: Remove dependency on Postfix [#5421](https://github.com/bolt/bolt/pull/5421)
+ - Updated: Update messages.en_GB.yml [#5386](https://github.com/bolt/bolt/pull/5386)
+ - Updated: Updating NPM dependencies, rebuild CSS and JS [#5410](https://github.com/bolt/bolt/pull/5410)
+
+
+Bolt 3.0.4
+----------
+
+Released 2016-06-01. Notable changes:
+
+ - Deprecation: Replace deprecated trimtext with excerpt. [#5381](https://github.com/bolt/bolt/pull/5381)
+ - Fixed: Adding style for widget(holders), pagination and record footers. Also updated `bower`/`npm` dependencies. [#5387](https://github.com/bolt/bolt/pull/5387)
+ - Fixed: Cast to string in thumbnail handling, prevent `substr() expects parameter 1 to be string` [#5329](https://github.com/bolt/bolt/pull/5329)
+ - Fixed: Missing PHP icon in webdev Toolbar. [#5376](https://github.com/bolt/bolt/pull/5376)
+ - Fixed: Tweak search input. No lowercasing search input, handle html and entities better. [#5374](https://github.com/bolt/bolt/pull/5374)
+ - Fixed: Update `_taxonomies.twig`, correctly add fields with `group: taxonomy` in contenttypes. [#5369](https://github.com/bolt/bolt/pull/5369)
+ - Fixed: Use path that includes subdirectories, to prevent breakage on Extend page. [#5389](https://github.com/bolt/bolt/pull/5389)
+ - Typo: Fixed Unfinished sentence in `config.yml` [#5370](https://github.com/bolt/bolt/pull/5370)
+
+Bolt 3.0.3
+----------
+
+Released 2016-05-25. Notable changes:
+
+ - Fixed: Stupid translation error in Dutch: The name of this project is Bolt, not "Bout". [#5367](https://github.com/bolt/bolt/pull/5367)
+ - Fixed: `bolt_log_system` collecting redundant entries for remote assets. [#5357](https://github.com/bolt/bolt/pull/5357)
+ - Fixed: Handle `json_array` for Sqlite separately [#5362](https://github.com/bolt/bolt/pull/5362)
+
+Bolt 3.0.2
+----------
+
+Released 2016-05-23. Notable changes:
+
+- Added: Function to allow comparitor to add ignored change when extending Database Schema. [#5360](https://github.com/bolt/bolt/pull/5360)
+- Fixed: Add last insert id support for Postgres. [#5355](https://github.com/bolt/bolt/pull/5355)
+- Fixed: Bind correct name, fixes 'select from server' in CKeditor. [#5354](https://github.com/bolt/bolt/pull/5354)
+- Fixed: Contenttype slugs with underscores now work correctly. [#5299](https://github.com/bolt/bolt/pull/5299)
+- Fixed: Delete button in sidebar, when editing a record. [#5353](https://github.com/bolt/bolt/pull/5353)
+- Fixed: Don't log external assets in `bolt_log_system`. [#5357](https://github.com/bolt/bolt/pull/5357)
+- Fixed: Link to Taxonomy and Routing pages in documentation. [#5328](https://github.com/bolt/bolt/pull/5328), [#5327](https://github.com/bolt/bolt/pull/5327)
+- Fixed: Postgres string aggregation to force cast. [#5345](https://github.com/bolt/bolt/pull/5345)
+- Fixed: Set Z-index for "full screen" CKeditor. [#5351](https://github.com/bolt/bolt/pull/5351)
+- Fixed: Updating `app/src/README.md` to use code highlighting. [#5330](https://github.com/bolt/bolt/pull/5330)
 
 Bolt 3.0.1
 ----------
@@ -142,7 +371,7 @@ Bolt 3.0.0 beta 1
 
 Released 2016-03-26. Notable changes:
 
- - So much new things, first release of majow new version. See: https://bolt.cm/newsitem/bolt-3-beta-1
+ - So much new things, first release of major new version. See: https://bolt.cm/newsitem/bolt-3-beta-1
 
 Bolt 2.2.20
 -----------

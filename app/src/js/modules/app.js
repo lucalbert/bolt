@@ -12,8 +12,6 @@
 (function (bolt, $, moment, init) {
     'use strict';
 
-    /*jshint latedef: nofunc */
-
     /**
      * Bolt.app mixin container.
      *
@@ -39,6 +37,97 @@
      * @type {boolean|undefined}
      */
     var gMapsApiLoaded;
+
+    /**
+     * Legacy stuff from start.js.
+     *
+     * @private
+     * @static
+     * @function legacyInit
+     * @memberof Bolt.app
+     * @todo Move functionality to Bolt mixins.
+     * @deprecated To be removed!
+     */
+    function legacyInit() {
+        // Initialisation
+        init.confirmationDialogs();
+        init.magnificPopup();
+        init.dropZone();
+        init.popOvers();
+        init.dropDowns();
+        init.deferredWidgets();
+        init.passwordInput();
+        init.sortables();
+        init.focusStatusSelect();
+        init.depublishTracking();
+
+        $('[data-bind]').each(function () {
+            var data = $(this).data('bind');
+            //console.log('Binding: ' + data.bind);
+
+            switch (data.bind) {
+                case 'editcontent': bolt.editcontent.init(data); break;
+                case 'editfile': init.bindEditFile(data); break;
+                case 'editlocale': init.bindEditLocale(data); break;
+                case 'filebrowser': init.bindFileBrowser(); break;
+                case 'ckfileselect': init.bindCkFileSelect(); break;
+                case 'prefill': init.bindPrefill(); break;
+            }
+        });
+    }
+
+    /**
+     * Initializes Bolts event handler.
+     *
+     * @private
+     * @static
+     * @function initHandler
+     * @memberof Bolt.app
+     *
+     * @fires "Bolt.GoogleMapsAPI.Load.Done"
+     * @fires "Bolt.GoogleMapsAPI.Load.Fail"
+     * @listens "Bolt.GoogleMapsAPI.Load.Request"
+     */
+    function initHandler() {
+        bolt.events.on('Bolt.GoogleMapsAPI.Load.Request', function () {
+            if (gMapsApiLoaded === undefined) {
+                // Request loading Google Maps API.
+                gMapsApiLoaded = false;
+                var gMapsApiUrl = 'https://maps.google.com/maps/api/js?sensor=false&callback=Bolt.app.gMapsApiReady';
+
+                // See if we have an apikey to append to the request
+                if(Bolt.conf.get('google_api_key')){
+                    gMapsApiUrl = gMapsApiUrl + '&key=' + Bolt.conf.get('google_api_key');
+                }
+                $.getScript(gMapsApiUrl)
+                    .fail(function () {
+                        gMapsApiLoaded = undefined;
+                        bolt.events.fire('Bolt.GoogleMapsAPI.Load.Fail');
+                    });
+            } else if (gMapsApiLoaded === true) {
+                // Already loaded, signal it.
+                bolt.events.fire('Bolt.GoogleMapsAPI.Load.Done');
+            }
+        });
+    }
+
+    /**
+     * Initializes globals.
+     *
+     * @private
+     * @function initBuic
+     * @memberof Bolt.app
+     */
+    function initGlobal() {
+        var localeLong = bolt.conf('locale.long');
+
+        // Init select2 language.
+        $.fn.select2.defaults.set('language', localeLong.replace('_', '-'));
+        // Set locale of moments.js.
+        moment.locale(localeLong);
+        // Set global datepicker locale.
+        $.datepicker.setDefaults($.datepicker.regional[localeLong]);
+    }
 
     /**
      * Callback that signals that Google Maps API is fully loaded.
@@ -130,92 +219,6 @@
      * Start when ready.
      */
     $(document).ready(app.run);
-
-    /**
-     * Legacy stuff from start.js.
-     *
-     * @private
-     * @static
-     * @function legacyInit
-     * @memberof Bolt.app
-     * @todo Move functionality to Bolt mixins.
-     * @deprecated To be removed!
-     */
-    function legacyInit() {
-        // Initialisation
-        init.confirmationDialogs();
-        init.magnificPopup();
-        init.dropZone();
-        init.popOvers();
-        init.dropDowns();
-        init.deferredWidgets();
-        init.passwordInput();
-        init.sortables();
-        init.focusStatusSelect();
-        init.depublishTracking();
-
-        $('[data-bind]').each(function () {
-            var data = $(this).data('bind');
-            //console.log('Binding: ' + data.bind);
-
-            switch (data.bind) {
-                case 'editcontent': bolt.editcontent.init(data); break;
-                case 'editfile': init.bindEditFile(data); break;
-                case 'editlocale': init.bindEditLocale(data); break;
-                case 'filebrowser': init.bindFileBrowser(); break;
-                case 'ckfileselect': init.bindCkFileSelect(); break;
-                case 'prefill': init.bindPrefill(); break;
-            }
-        });
-    }
-
-    /**
-     * Initializes Bolts event handler.
-     *
-     * @private
-     * @static
-     * @function initHandler
-     * @memberof Bolt.app
-     *
-     * @fires "Bolt.GoogleMapsAPI.Load.Done"
-     * @fires "Bolt.GoogleMapsAPI.Load.Fail"
-     * @listens "Bolt.GoogleMapsAPI.Load.Request"
-     */
-    function initHandler() {
-        bolt.events.on('Bolt.GoogleMapsAPI.Load.Request', function () {
-            if (gMapsApiLoaded === undefined) {
-                // Request loading Google Maps API.
-                gMapsApiLoaded = false;
-                $.getScript('https://maps.google.com/maps/api/js?sensor=false&callback=Bolt.app.gMapsApiReady')
-                    .fail(function () {
-                        gMapsApiLoaded = undefined;
-                        bolt.events.fire('Bolt.GoogleMapsAPI.Load.Fail');
-                    });
-            } else if (gMapsApiLoaded === true) {
-                // Already loaded, signal it.
-                bolt.events.fire('Bolt.GoogleMapsAPI.Load.Done');
-            }
-        });
-    }
-
-    /**
-     * Initializes globals.
-     *
-     * @private
-     * @function initBuic
-     * @memberof Bolt.app
-     */
-    function initGlobal() {
-        var localeLong = bolt.conf('locale.long');
-
-        // Init select2 language.
-        $.fn.select2.defaults.set('language', localeLong.replace('_', '-'));
-        // Set locale of moments.js.
-        moment.locale(localeLong);
-        // Set global datepicker locale.
-        $.datepicker.setDefaults($.datepicker.regional[localeLong]);
-    }
-
 
     // Apply mixin container
     bolt.app = app;

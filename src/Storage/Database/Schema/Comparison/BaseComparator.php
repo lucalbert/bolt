@@ -164,6 +164,16 @@ abstract class BaseComparator
     }
 
     /**
+     * Add an ignored change to the list.
+     *
+     * @param IgnoredChange $ignoredChange
+     */
+    public function addIgnoredChange(IgnoredChange $ignoredChange)
+    {
+        $this->ignoredChanges[] = $ignoredChange;
+    }
+
+    /**
      * Create a list of changes this platform will ignore.
      */
     abstract protected function setIgnoredChanges();
@@ -215,6 +225,7 @@ abstract class BaseComparator
         $tableName = $fromTable->getName();
         $diff = (new Comparator())->diffTable($fromTable, $toTable);
         if ($diff !== false) {
+            $this->removeIgnoredChanges($diff);
             $this->diffs[$tableName] = $diff;
         }
     }

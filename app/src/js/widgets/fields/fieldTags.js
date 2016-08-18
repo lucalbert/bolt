@@ -41,7 +41,7 @@
 
             // Initialize the tag selector.
             if (!this.options.allowSpaces) {
-              separators.push(' ');
+                separators.push(' ');
             }
             taxonomy.select2({
                 width: '100%',
@@ -93,7 +93,7 @@
 
                             tagcloud.find('button').on('click', function () {
                                 var text = $(this).text(),
-                                    option = taxonomy.find('option[value=' + text + ']');
+                                    option = taxonomy.find('option[value="' + text + '"]');
 
                                 if (option.length > 0) {
                                     // Just select if tag exists…

@@ -2,6 +2,7 @@
 
 namespace Bolt\Storage;
 
+use ArrayObject;
 use Bolt\Events\HydrationEvent;
 use Bolt\Events\StorageEvent;
 use Bolt\Events\StorageEvents;
@@ -43,16 +44,22 @@ class Repository implements ObjectRepository
     /**
      * Creates a new empty entity and passes the supplied data to the constructor.
      *
-     * @param array $params
+     * @param array         $params
+     * @param ClassMetadata $metadata
      *
      * @return Entity
      */
     public function create($params = [], ClassMetadata $metadata = null)
     {
-        $entity = $this->getEntityBuilder()->create($params, $metadata);
+        $params = new ArrayObject($params);
+        $builder = $this->getEntityBuilder();
+        /** @var Entity $entity */
+        $entity = $builder->getEntity();
         $preEventArgs = new HydrationEvent($params, ['entity' => $entity, 'repository' => $this]);
         $this->event()->dispatch(StorageEvents::PRE_HYDRATE, $preEventArgs);
-        $this->event()->dispatch(StorageEvents::POST_HYDRATE, $preEventArgs);
+        $builder->create($params, $entity);
+        $postEventArgs = new HydrationEvent($params, ['entity' => $entity, 'repository' => $this]);
+        $this->event()->dispatch(StorageEvents::POST_HYDRATE, $postEventArgs);
 
         return $entity;
     }
@@ -181,7 +188,7 @@ class Repository implements ObjectRepository
     /**
      * Method to hydrate and return a QueryBuilder query.
      *
-     * @return array Entity | false
+     * @return array Entity
      **/
     public function findWith(QueryBuilder $query)
     {
@@ -191,7 +198,7 @@ class Repository implements ObjectRepository
         if ($result) {
             return $this->hydrateAll($result, $query);
         } else {
-            return false;
+            return [];
         }
     }
 
@@ -324,7 +331,7 @@ class Repository implements ObjectRepository
     /**
      * Saves a single object.
      *
-     * @param object $entity The entity to delete.
+     * @param object $entity The entity to save.
      * @param bool   $silent Suppress events
      *
      * @return bool
@@ -419,6 +426,7 @@ class Repository implements ObjectRepository
     {
         $entity = $this->getEntityBuilder()->getEntity();
 
+        $data = new ArrayObject($data);
         $preEventArgs = new HydrationEvent($data, ['entity' => $entity, 'repository' => $this]);
         $this->event()->dispatch(StorageEvents::PRE_HYDRATE, $preEventArgs);
 
