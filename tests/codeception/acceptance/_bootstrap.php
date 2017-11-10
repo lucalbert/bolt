@@ -4,11 +4,10 @@ use Codeception\Util\Autoload;
 use Codeception\Util\Fixtures;
 
 /**
- * Bootstrap for Codeception tests
+ * Bootstrap for Codeception tests.
  *
  * @author Gawain Lynch <gawain.lynch@gmail.com>
  */
-
 Autoload::addNamespace('\\', __DIR__);
 
 // User IDs
@@ -54,21 +53,25 @@ Fixtures::add('users', [
 // Files that we'll backup. If they exist when we run, then we keep the
 // original in tact before starting the suite run
 Fixtures::add('backups', [
-    INSTALL_ROOT . '/app/config/config.yml'                                => false,
-    INSTALL_ROOT . '/app/config/contenttypes.yml'                          => false,
-    INSTALL_ROOT . '/app/config/menu.yml'                                  => false,
-    INSTALL_ROOT . '/app/config/permissions.yml'                           => false,
-    INSTALL_ROOT . '/app/config/routing.yml'                               => false,
-    INSTALL_ROOT . '/app/config/taxonomy.yml'                              => false,
-    BOLT_ROOT . '/app/resources/translations/en_GB/messages.en_GB.yml'     => true,
-    BOLT_ROOT . '/app/resources/translations/en_GB/infos.en_GB.yml'        => true,
-    BOLT_ROOT . '/app/resources/translations/en_GB/contenttypes.en_GB.yml' => true,
-    INSTALL_ROOT . '/app/database/bolt.db'                                 => false,
-    INSTALL_ROOT . '/theme/base-2016/partials/_footer.twig'                => true,
+    INSTALL_ROOT . '/config/config.yml'                            => false,
+    INSTALL_ROOT . '/config/contenttypes.yml'                      => false,
+    INSTALL_ROOT . '/config/menu.yml'                              => false,
+    INSTALL_ROOT . '/config/permissions.yml'                       => false,
+    INSTALL_ROOT . '/config/routing.yml'                           => false,
+    INSTALL_ROOT . '/config/taxonomy.yml'                          => false,
+    BOLT_ROOT . '/app/translations/en_GB/messages.en_GB.yml'       => true,
+    BOLT_ROOT . '/app/translations/en_GB/infos.en_GB.yml'          => true,
+    BOLT_ROOT . '/app/translations/en_GB/contenttypes.en_GB.yml'   => true,
+    INSTALL_ROOT . '/app/database/bolt.db'                         => false,
+    INSTALL_ROOT . '/public/theme/base-2016/theme.yml'             => true,
+    INSTALL_ROOT . '/public/theme/base-2016/partials/_footer.twig' => true,
 ]);
 
 // Session and authentication tokens
 Fixtures::add('tokenNames', [
-    'session'   => 'bolt_session_' . md5('localhost:8123'),
-    'authtoken' => 'bolt_authtoken_' . md5('localhost:8123'),
+    'session'   => 'bolt_session_' . md5('localhost'),
+    'authtoken' => 'bolt_authtoken_' . md5('localhost'),
 ]);
+
+// Temporary hack
+restore_error_handler();

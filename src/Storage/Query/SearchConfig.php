@@ -8,13 +8,16 @@ use Bolt\Config;
  * This class takes an overall config array as input and parses into values
  * applicable for performing searches.
  *
- * This takes into account contenttypes that aren't searchable along with
+ * This takes into account ContentTypes that aren't searchable along with
  * taxonomy and field weightings.
  */
 class SearchConfig
 {
+    /** @var array|Config */
     protected $config = [];
+    /** @var array */
     protected $searchableTypes = [];
+    /** @var array */
     protected $joins = [];
 
     public function __construct(Config $config)
@@ -59,15 +62,13 @@ class SearchConfig
     /**
      * Iterates over the main config and delegates weighting to both
      * searchable columns and searchable taxonomies.
-     *
-     * @return void
      */
     protected function parseContenttypes()
     {
         $contentTypes = $this->config->get('contenttypes');
 
         foreach ($contentTypes as $type => $values) {
-            if (! $this->isInvisible($type)) {
+            if (!$this->isInvisible($type)) {
                 $this->getSearchableColumns($type);
                 if (isset($values['taxonomy'])) {
                     $this->parseTaxonomies($type, $values['taxonomy']);
@@ -77,13 +78,11 @@ class SearchConfig
     }
 
     /**
-     * Iterates the taxonomies for a given contenttype, then assigns a
+     * Iterates the taxonomies for a given ContentType, then assigns a
      * weighting based on type.
      *
      * @param string $contentType
      * @param array  $taxonomies
-     *
-     * @return void
      */
     protected function parseTaxonomies($contentType, $taxonomies)
     {
@@ -102,7 +101,7 @@ class SearchConfig
     }
 
     /**
-     * Helper method to return the join search columns for a contenttype
+     * Helper method to return the join search columns for a ContentType
      * weighting based on type.
      *
      * @param string $contentType
@@ -115,11 +114,9 @@ class SearchConfig
     }
 
     /**
-     * Determine what columns are searchable for a given contenttype.
+     * Determine what columns are searchable for a given ContentType.
      *
      * @param string $type
-     *
-     * @return void
      */
     protected function getSearchableColumns($type)
     {
@@ -142,8 +139,8 @@ class SearchConfig
     }
 
     /**
-     * Does some checks to see whether a contenttype should appear in search results.
-     * This is based on contenttype options.
+     * Does some checks to see whether a ContentType should appear in search results.
+     * This is based on ContentType options.
      *
      * @param string $contentType
      *
@@ -153,10 +150,10 @@ class SearchConfig
     {
         $info = $this->config->get('contenttypes/' . $contentType);
         if ($info) {
-            if (array_key_exists('viewless', $info) && $info['viewless'] == true) {
+            if (array_key_exists('viewless', $info) && $info['viewless'] === true) {
                 return true;
             }
-            if (array_key_exists('searchable', $info) && $info['searchable'] == false) {
+            if (array_key_exists('searchable', $info) && $info['searchable'] === false) {
                 return true;
             }
         }

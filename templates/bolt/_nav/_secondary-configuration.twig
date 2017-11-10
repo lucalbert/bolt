@@ -1,0 +1,24 @@
+{% import '@bolt/_nav/_macros.twig' as nav %}
+{% spaceless %}
+    {% set menu = menus.get('config') %}
+    {% set sub = [] %}
+
+    {% if menu.has('users') %}{% set sub = sub|merge([menu.get('users')]) %}{% endif %}
+    {% if menu.has('config_main') %}{% set sub = sub|merge([menu.get('config_main')]) %}{% endif %}
+    {% if menu.has('config_contenttypes') %}{% set sub = sub|merge([menu.get('config_contenttypes')]) %}{% endif %}
+    {% if menu.has('config_taxonomy') %}{% set sub = sub|merge([menu.get('config_taxonomy')]) %}{% endif %}
+
+    {% set sub = sub|merge(['-']) %}
+
+    {% if menu.has('config_menu') %}{% set sub = sub|merge([menu.get('config_menu')]) %}{% endif %}
+    {% if menu.has('config_routing') %}{% set sub = sub|merge([menu.get('config_routing')]) %}{% endif %}
+
+    {% set sub = sub|merge(['-']) %}
+
+    {% if menu.has('dbcheck') %}{% set sub = sub|merge([menu.get('dbcheck')]) %}{% endif %}
+    {% if menu.has('clearcache') %}{% set sub = sub|merge([menu.get('clearcache')]) %}{% endif %}
+    {% if menu.has('log_change') %}{% set sub = sub|merge([menu.get('log_change')]) %}{% endif %}
+    {% if menu.has('log_system') %}{% set sub = sub|merge([menu.get('log_system')]) %}{% endif %}
+    {% if menu.has('setup_checks') %}{% set sub = sub|merge([menu.get('setup_checks')]) %}{% endif %}
+{% endspaceless %}
+{{ nav.submenu('fa:cogs', __('general.phrase.configuration'), sub, (page_nav == 'Settings/Configuration')) }}

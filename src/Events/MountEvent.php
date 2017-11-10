@@ -1,10 +1,11 @@
 <?php
+
 namespace Bolt\Events;
 
 use LogicException;
+use Silex\Api\ControllerProviderInterface;
 use Silex\Application;
 use Silex\ControllerCollection;
-use Silex\ControllerProviderInterface;
 use Symfony\Component\EventDispatcher\Event;
 
 /**

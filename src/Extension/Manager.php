@@ -4,12 +4,16 @@ namespace Bolt\Extension;
 
 use Bolt\Composer\EventListener\PackageDescriptor;
 use Bolt\Config;
+use Bolt\Filesystem\Adapter\Local;
 use Bolt\Filesystem\Exception\FileNotFoundException;
+use Bolt\Filesystem\Filesystem;
 use Bolt\Filesystem\FilesystemInterface;
 use Bolt\Filesystem\Handler\DirectoryInterface;
 use Bolt\Filesystem\Handler\JsonFile;
 use Bolt\Logger\FlashLoggerInterface;
 use Bolt\Translation\LazyTranslator as Trans;
+use Pimple\Container;
+use ReflectionClass;
 use Silex\Application;
 use Symfony\Component\Debug\Exception\ContextErrorException;
 
@@ -34,11 +38,11 @@ class Manager
     /** @var Config */
     private $config;
     /** @var bool */
+    private $booted = false;
+    /** @var bool */
     private $loaded = false;
     /** @var bool */
     private $registered = false;
-    /** @var Application @deprecated */
-    private $app;
 
     /**
      * Constructor.
@@ -119,12 +123,25 @@ class Manager
         }
 
         // Set paths in the extension
-        if ($baseDir !== null) {
-            $extension->setBaseDirectory($baseDir);
+        if ($baseDir === null) {
+            // If there is no base dir we just default to the same directory as the extension class is in.
+            $reflector = new ReflectionClass($extension);
+            $dir = dirname($reflector->getFileName());
+            if (basename($dir) === 'src') {
+                $dir = dirname($dir);
+            } elseif (basename(dirname($dir)) === 'src') {
+                $dir = dirname(dirname($dir));
+            }
+            $fs = new Filesystem(new Local($dir));
+
+            $baseDir = $fs->getDir('/');
         }
-        if ($webDir !== null) {
-            $extension->setWebDirectory($webDir);
+        $extension->setBaseDirectory($baseDir);
+
+        if ($webDir === null) {
+            $webDir = $this->webFs->getDir($extension->getId());
         }
+        $extension->setWebDirectory($webDir);
 
         // Determine if enabled
         $enabled = $this->config->get('extensions/' . $extension->getId(), true);
@@ -170,19 +187,16 @@ class Manager
             }
             $this->addManagedExtension($descriptor);
         }
-
-        $this->loaded = true;
     }
 
     /**
      * Call register() for each extension.
      *
-     *
-     * @param Application $app
+     * @param Container $app
      *
      * @throws \RuntimeException
      */
-    public function register(Application $app)
+    public function register(Container $app)
     {
         if ($this->registered) {
             throw new \RuntimeException('Can not re-register extensions.');
@@ -197,9 +211,37 @@ class Manager
             }
         }
         $this->registered = true;
+    }
 
-        // @deprecated Deprecated since 3.0, to be removed in 4.0.
-        $this->app = $app;
+    /**
+     * Call boot() for each extension loader that implements ServiceProviderInterface.
+     *
+     * @internal
+     *
+     * @param Application $app
+     *
+     * @throws \RuntimeException
+     */
+    public function boot(Application $app)
+    {
+        if (!$this->registered) {
+            throw new \RuntimeException('Can not boot extensions prior to completion of registration.');
+        }
+        if ($this->booted) {
+            throw new \RuntimeException('Can not re-boot extensions.');
+        }
+
+        // Boot all extension loaders that are also service providers
+        foreach ($this->extensions as $extension) {
+            if ($extension->isEnabled() !== true) {
+                continue;
+            }
+            foreach ($extension->getInnerExtension()->getServiceProviders() as $provider) {
+                $provider->boot($app);
+            }
+        }
+        $this->loaded = true;
+        $this->booted = true;
     }
 
     /**
@@ -234,11 +276,10 @@ class Manager
     {
         $className = $descriptor->getClass();
         if ($this->isClassLoadable($className) === false) {
-            if ($descriptor->getType() === 'local' && $this->isClassLoadable('Wikimedia\Composer\MergePlugin') === false) {
-                $this->flashLogger->error(Trans::__('general.phrase.error-local-extension-set-up-incomplete', ['%NAME%' => $descriptor->getName(), '%CLASS%' => $className]));
-            } else {
-                $this->flashLogger->error(Trans::__("Extension package %NAME% has an invalid class '%CLASS%' and has been skipped.", ['%NAME%' => $descriptor->getName(), '%CLASS%' => $className]));
-            }
+            $this->flashLogger->error(Trans::__(
+                'page.extend.error-class-invalid',
+                ['%NAME%' => $descriptor->getName(), '%CLASS%' => $className]
+            ));
 
             return;
         }
@@ -252,7 +293,10 @@ class Manager
                 ->setDescriptor($descriptor)
             ;
         } else {
-            $this->flashLogger->error(Trans::__("Extension package %NAME% base class '%CLASS%' does not implement \\Bolt\\Extension\\ExtensionInterface and has been skipped.", ['%NAME%' => $descriptor->getName(), '%CLASS%' => $className]));
+            $this->flashLogger->error(Trans::__(
+                'page.extend.error-class-implement',
+                ['%NAME%' => $descriptor->getName(), '%CLASS%' => $className, '%TARGET%' => ExtensionInterface::class]
+            ));
         }
     }
 
@@ -280,15 +324,5 @@ class Manager
         }
 
         return $exists;
-    }
-
-    /**
-     * @deprecated Deprecated since 3.0, to be removed in 4.0.
-     *
-     * @internal Do not use! For legacy support only.
-     */
-    protected function getApp()
-    {
-        return $this->app;
     }
 }

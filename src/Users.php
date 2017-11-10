@@ -3,13 +3,13 @@
 namespace Bolt;
 
 use Bolt\AccessControl\Permissions;
+use Bolt\Common\Deprecated;
 use Bolt\Storage\Entity;
 use Bolt\Storage\Repository;
 use Bolt\Translation\Translator as Trans;
 use Doctrine\DBAL\Exception\TableNotFoundException;
 use Silex;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\Security\Csrf\CsrfToken;
 
 /**
  * Class to handle things dealing with users.
@@ -42,7 +42,7 @@ class Users
     private function getRepository()
     {
         if ($this->repository === null) {
-            $this->repository = $this->app['storage']->getRepository('Bolt\Storage\Entity\Users');
+            $this->repository = $this->app['storage']->getRepository(Entity\Users::class);
         }
 
         return $this->repository;
@@ -73,6 +73,8 @@ class Users
      */
     public function isValidSession()
     {
+        Deprecated::method(3.0);
+
         $request = Request::createFromGlobals();
         $authCookie = $request->cookies->get($this->app['token.authentication.name']);
         if ($authCookie === null) {
@@ -87,6 +89,8 @@ class Users
      */
     public function checkValidSession()
     {
+        Deprecated::method(3.0);
+
         $request = Request::createFromGlobals();
         $authCookie = $request->cookies->get($this->app['token.authentication.name']);
         if ($authCookie === null) {
@@ -99,35 +103,10 @@ class Users
     /**
      * @deprecated Deprecated since 3.0, to be removed in 4.0.
      */
-    public function getAntiCSRFToken()
-    {
-        return $this->app['csrf']->getToken('bolt')->getValue();
-    }
-
-    /**
-     * @deprecated Deprecated since 3.0, to be removed in 4.0.
-     */
-    public function checkAntiCSRFToken($token = '')
-    {
-        if (empty($token)) {
-            $token = $this->app['request']->get('bolt_csrf_token');
-        }
-
-        $token = new CsrfToken('bolt', $token);
-        if ($this->app['csrf']->isTokenValid($token)) {
-            return true;
-        } else {
-            $this->app['logger.flash']->warning('The security token was incorrect. Please try again.');
-
-            return false;
-        }
-    }
-
-    /**
-     * @deprecated Deprecated since 3.0, to be removed in 4.0.
-     */
     public function getActiveSessions()
     {
+        Deprecated::method(3.0);
+
         return $this->app['access_control']->getActiveSessions();
     }
 
@@ -148,11 +127,11 @@ class Users
             return false;
         }
 
-        $userName = $user->getUsername();
+        $userId = $user->getId();
         if ($result = $this->getRepository()->delete($user)) {
             /** @var Repository\AuthtokenRepository $authtokenRepository */
-            $authtokenRepository = $this->app['storage']->getRepository('Bolt\Storage\Entity\Authtoken');
-            $authtokenRepository->deleteTokens($userName);
+            $authtokenRepository = $this->app['storage']->getRepository(Entity\Authtoken::class);
+            $authtokenRepository->deleteTokens($userId);
         }
 
         return $result;
@@ -205,9 +184,7 @@ class Users
      */
     public function hasUsers()
     {
-        $rows = $this->getRepository()->hasUsers();
-
-        return $rows ? (integer) $rows['count'] : 0;
+        return $this->getRepository()->count();
     }
 
     /**
@@ -279,6 +256,8 @@ class Users
      */
     public function getCurrentUsername()
     {
+        Deprecated::method(3.0);
+
         return $this->getCurrentUserProperty('username');
     }
 
@@ -423,7 +402,7 @@ class Users
     public function checkForRoot()
     {
         // Don't check for root, if we're not logged in.
-        if ($this->getCurrentUsername() === false) {
+        if ($this->getCurrentUser() === false) {
             return false;
         }
 
@@ -444,7 +423,9 @@ class Users
         $this->app['logger.flash']->info(Trans::__('general.phrase.missing-root-jackpot'));
 
         // If we reach this point, there is no user 'root'. We promote the current user.
-        return $this->addRole($this->getCurrentUsername(), 'root');
+        $user = $this->getCurrentUser();
+
+        return $this->addRole($user['id'], 'root');
     }
 
     /**
@@ -556,6 +537,8 @@ class Users
      */
     public function updateUserLogin($user)
     {
+        Deprecated::method(3.0);
+
         return $this->app['access_control']->updateUserLogin($user);
     }
 }

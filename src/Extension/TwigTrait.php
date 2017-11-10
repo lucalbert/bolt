@@ -3,12 +3,14 @@
 namespace Bolt\Extension;
 
 use Bolt\Filesystem\Handler\DirectoryInterface;
-use Bolt\Twig\DynamicExtension;
-use Pimple as Container;
-use Twig_Error_Loader as LoaderError;
-use Twig_Loader_Filesystem as FilesystemLoader;
-use Twig_SimpleFilter as SimpleFilter;
-use Twig_SimpleFunction as SimpleFunction;
+use Bolt\Twig\SecurityPolicy;
+use Pimple\Container;
+use Twig\Environment;
+use Twig\Error\LoaderError;
+use Twig\Extension\SandboxExtension;
+use Twig\Loader\FilesystemLoader;
+use Twig\TwigFilter;
+use Twig\TwigFunction;
 
 /**
  * Twig function/filter addition and interface functions for an extension.
@@ -18,12 +20,14 @@ use Twig_SimpleFunction as SimpleFunction;
  */
 trait TwigTrait
 {
-    /** @var DynamicExtension */
-    private $twigExtension;
-    /** @var DynamicExtension */
-    private $safeTwigExtension;
-    /** @var bool */
-    private $loadedTwig = false;
+    /** @var TwigFilter[] */
+    private $twigFilters = [];
+    /** @var TwigFunction[] */
+    private $twigFunctions = [];
+    /** @var string[] */
+    private $safeFilterNames = [];
+    /** @var string[] */
+    private $safeFunctionNames = [];
     /** @var bool */
     private $pathAdded = false;
 
@@ -90,46 +94,23 @@ trait TwigTrait
     {
         $app = $this->getContainer();
 
-        $app['twig'] = $app->share(
-            $app->extend(
-                'twig',
-                function ($twig) {
-                    $this->loadTwig();
+        $app['twig'] = $app->extend(
+            'twig',
+            function (Environment $twig) {
+                $this->loadTwig($twig);
 
-                    if ($this->twigExtension) {
-                        $twig->addExtension($this->twigExtension);
-                    }
-
-                    return $twig;
-                }
-            )
-        );
-
-        $app['safe_twig'] = $app->share(
-            $app->extend(
-                'safe_twig',
-                function ($twig) {
-                    $this->loadTwig();
-
-                    if ($this->safeTwigExtension) {
-                        $twig->addExtension($this->safeTwigExtension);
-                    }
-
-                    return $twig;
-                }
-            )
+                return $twig;
+            }
         );
     }
 
     /**
-     * Lazily adds filters and functions to our DynamicExtensions
+     * Adds filters and functions to Twig Environment.
+     *
+     * @param Environment $twig
      */
-    private function loadTwig()
+    private function loadTwig(Environment $twig)
     {
-        if ($this->loadedTwig) {
-            return;
-        }
-
         foreach ($this->registerTwigFunctions() as $name => $options) {
             if (is_string($options)) {
                 $this->addTwigFunction($name, $options);
@@ -154,7 +135,37 @@ trait TwigTrait
             }
         }
 
-        $this->loadedTwig = true;
+        foreach ($this->twigFunctions as $twigFunction) {
+            $twig->addFunction($twigFunction);
+        }
+
+        foreach ($this->twigFilters as $twigFilter) {
+            $twig->addFilter($twigFilter);
+        }
+
+        $this->updateSandboxPolicy($twig);
+    }
+
+    private function updateSandboxPolicy(Environment $twig)
+    {
+        if (!$twig->hasExtension(SandboxExtension::class)) {
+            return;
+        }
+
+        /** @var SandboxExtension $sandbox */
+        $sandbox = $twig->getExtension(SandboxExtension::class);
+        $policy = $sandbox->getSecurityPolicy();
+        if (!$policy instanceof SecurityPolicy) {
+            return;
+        }
+
+        foreach ($this->safeFunctionNames as $name) {
+            $policy->addAllowedFunction($name);
+        }
+
+        foreach ($this->safeFilterNames as $name) {
+            $policy->addAllowedFilter($name);
+        }
     }
 
     /**
@@ -163,7 +174,7 @@ trait TwigTrait
      * @param string $path
      * @param array  $options
      *
-     * @throws \Twig_Error_Loader
+     * @throws LoaderError
      */
     private function addTwigPath($path, array $options = [])
     {
@@ -194,13 +205,11 @@ trait TwigTrait
     /**
      * Add a Twig Function.
      *
-     * @internal Will be made private in 4.0. Use registerTwigFunctions() instead.
-     *
      * @param string          $name
      * @param string|callable $callback
      * @param array           $options
      */
-    protected function addTwigFunction($name, $callback, $options = [])
+    private function addTwigFunction($name, $callback, $options = [])
     {
         // If we pass a callback as a simple string, we need to turn it into an array.
         if (is_string($callback) && method_exists($this, $callback)) {
@@ -213,31 +222,21 @@ trait TwigTrait
             unset($options['safe']);
         }
 
-        $function = new SimpleFunction($name, $callback, $options);
-
-        if ($this->twigExtension === null) {
-            $this->twigExtension = new DynamicExtension($this->getName());
-        }
-        $this->twigExtension->addFunction($function);
+        $this->twigFunctions[] = new TwigFunction($name, $callback, $options);
 
         if ($safe) {
-            if ($this->safeTwigExtension === null) {
-                $this->safeTwigExtension = new DynamicExtension($this->getName());
-            }
-            $this->safeTwigExtension->addFunction($function);
+            $this->safeFunctionNames[] = $name;
         }
     }
 
     /**
      * Add a Twig Filter.
      *
-     * @internal Will be made private in 4.0. Use registerTwigFilters() instead.
-     *
      * @param string          $name
      * @param string|callable $callback
      * @param array           $options
      */
-    protected function addTwigFilter($name, $callback, $options = [])
+    private function addTwigFilter($name, $callback, $options = [])
     {
         // If we pass a callback as a simple string, we need to turn it into an array.
         if (is_string($callback) && method_exists($this, $callback)) {
@@ -250,18 +249,10 @@ trait TwigTrait
             unset($options['safe']);
         }
 
-        $filter = new SimpleFilter($name, $callback, $options);
-
-        if ($this->twigExtension === null) {
-            $this->twigExtension = new DynamicExtension($this->getName());
-        }
-        $this->twigExtension->addFilter($filter);
+        $this->twigFilters[] = new TwigFilter($name, $callback, $options);
 
         if ($safe) {
-            if ($this->safeTwigExtension === null) {
-                $this->safeTwigExtension = new DynamicExtension($this->getName());
-            }
-            $this->safeTwigExtension->addFilter($filter);
+            $this->safeFilterNames[] = $name;
         }
     }
 

@@ -1,14 +1,14 @@
 <?php
+
 namespace Bolt\Tests\Provider;
 
 use Bolt\Application;
-use Bolt\Configuration\ResourceManager;
-use Bolt\Provider\TranslationServiceProvider;
+use Bolt\Configuration\PathResolver;
 use Bolt\Tests\BoltUnitTest;
 use Symfony\Component\Filesystem\Filesystem;
 
 /**
- * Class to test src/Provider/TranslationServiceProvider.
+ * @covers \Bolt\Provider\TranslationServiceProvider
  *
  * @author Ross Riley <riley.ross@gmail.com>
  */
@@ -17,19 +17,13 @@ class TranslationServiceProviderTest extends BoltUnitTest
     public function testProvider()
     {
         $app = $this->getApp();
-        $provider = new TranslationServiceProvider($app);
-        $app->register($provider);
-        $app->boot();
         $this->assertNotNull($app['translator']->getLocale());
     }
 
     public function testLocaleChange()
     {
-        $app = $this->getApp();
+        $app = $this->getApp(false);
         $app['locale'] = 'de_XX';
-        $provider = new TranslationServiceProvider($app);
-        $app->register($provider);
-        $app->boot();
         $this->assertEquals('de_XX', $app['translator']->getLocale());
     }
 
@@ -37,7 +31,6 @@ class TranslationServiceProviderTest extends BoltUnitTest
     {
         $app = $this->makeApp();
         $this->registerTranslationServiceWithCachingDisabled($app);
-        $app->initialize();
         $app->boot();
         $this->assertEquals('About', $app['translator']->trans('general.about'));
     }
@@ -45,9 +38,8 @@ class TranslationServiceProviderTest extends BoltUnitTest
     public function testShortLocaleFallback()
     {
         $app = $this->makeApp();
-        $this->initializeFakeTranslationFiles('xx', 'general.about: "So very about"', $app['resources']);
+        $this->initializeFakeTranslationFiles('xx', 'general.about: "So very about"', $app['path_resolver']);
         $this->registerTranslationServiceWithCachingDisabled($app);
-        $app->initialize();
         $app['locale'] = 'xx_XX';
         $app->boot();
         $this->assertEquals('So very about', $app['translator']->trans('general.about'));
@@ -56,9 +48,8 @@ class TranslationServiceProviderTest extends BoltUnitTest
     public function testTranslationLoadingOverride()
     {
         $app = $this->makeApp();
-        $this->initializeFakeTranslationFiles('en_GB', 'general.about: "Not so about"', $app['resources']);
+        $this->initializeFakeTranslationFiles('en_GB', 'general.about: "Not so about"', $app['path_resolver']);
         $this->registerTranslationServiceWithCachingDisabled($app);
-        $app->initialize();
         $app->boot();
         $this->assertEquals('Not so about', $app['translator']->trans('general.about'));
     }
@@ -79,16 +70,16 @@ class TranslationServiceProviderTest extends BoltUnitTest
     }
 
     /**
-     * @param string          $locale
-     * @param string          $fileContent
-     * @param ResourceManager $resources
+     * @param string       $locale
+     * @param string       $fileContent
+     * @param PathResolver $pathResolver
      */
-    protected function initializeFakeTranslationFiles($locale, $fileContent, ResourceManager $resources)
+    protected function initializeFakeTranslationFiles($locale, $fileContent, PathResolver $pathResolver)
     {
-        $fakeAppRoot        = $resources->getPath('cache');
-        $fakeTranslationDir = "{$fakeAppRoot}/app/resources/translations/{$locale}";
+        $fakeAppRoot = $pathResolver->resolve('cache');
+        $pathResolver->define('root', $fakeAppRoot);
+        $fakeTranslationDir = "{$fakeAppRoot}/app/translations/{$locale}";
         (new Filesystem())->mkdir($fakeTranslationDir);
         file_put_contents("{$fakeTranslationDir}/messages.{$locale}.yml", $fileContent);
-        $resources->setPath('root', $fakeAppRoot);
     }
 }

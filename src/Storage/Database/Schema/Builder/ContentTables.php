@@ -7,6 +7,7 @@ use Bolt\Storage\Database\Schema\Table\ContentType;
 use Bolt\Storage\Field\Manager as FieldManager;
 use Doctrine\DBAL\Schema\Schema;
 use Doctrine\DBAL\Schema\Table;
+use Doctrine\DBAL\Types\Type;
 
 /**
  * Builder for Bolt content tables.
@@ -110,12 +111,12 @@ class ContentTables extends BaseBuilder
         if ($tableObj->isKnownType($values['type'])) {
             // Use loose comparison on true as 'true' in YAML is a string
             $addIndex = isset($values['index']) && (boolean) $values['index'] === true;
-            // Add the contenttype's specific fields
+            // Add the ContentType's specific fields
             $tableObj->addCustomFields($fieldName, $this->getContentTypeTableColumnType($values), $addIndex);
         } elseif ($handler = $fieldManager->getDatabaseField($values['type'])) {
-            // Add template fields
+            $type = ($handler->getStorageType() instanceof Type) ? $handler->getStorageType()->getName() : $handler->getStorageType();
             /** @var $handler \Bolt\Storage\Field\FieldInterface */
-            $table->addColumn($fieldName, $handler->getStorageType(), $handler->getStorageOptions());
+            $table->addColumn($fieldName, $type, $handler->getStorageOptions());
         }
     }
 
@@ -129,7 +130,7 @@ class ContentTables extends BaseBuilder
     private function getContentTypeTableColumnType(array $values)
     {
         // Multi-value selects are stored as JSON arrays
-        if (isset($values['type']) && $values['type'] === 'select' && isset($values['multiple']) && $values['multiple'] === 'true') {
+        if (isset($values['type']) && $values['type'] === 'select' && isset($values['multiple']) && $values['multiple'] === true) {
             return 'selectmultiple';
         }
 

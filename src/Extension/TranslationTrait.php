@@ -5,10 +5,12 @@ namespace Bolt\Extension;
 use Bolt\Filesystem\Adapter\Local;
 use Bolt\Filesystem\Filesystem;
 use Bolt\Filesystem\Handler\DirectoryInterface;
-use Pimple as Container;
+use Pimple\Container;
 
 /**
- * Automatic translation inclusion for an extension based upon three factors.
+ * Automatic translation inclusion for an extension.
+ *
+ * Based upon three factors:
  *  - All translations are in the translations dub-directory of the extension
  *  - Translations are named as en.yml, en_GB.yml, or etc... based upon the locale
  *
@@ -25,21 +27,19 @@ trait TranslationTrait
     {
         $app = $this->getContainer();
 
-        $app['translator'] = $app->share(
-            $app->extend(
-                'translator',
-                function ($translator) {
-                    $translations = $this->loadTranslationsFromDefaultPath();
-                    if ($translations === null) {
-                        return $translator;
-                    }
-                    foreach ($translations as $translation) {
-                        $translator->addResource($translation[0], $translation[1], $translation[2]);
-                    }
-
+        $app['translator'] = $app->extend(
+            'translator',
+            function ($translator) {
+                $translations = $this->loadTranslationsFromDefaultPath();
+                if ($translations === null) {
                     return $translator;
                 }
-            )
+                foreach ($translations as $translation) {
+                    $translator->addResource($translation[0], $translation[1], $translation[2]);
+                }
+
+                return $translator;
+            }
         );
     }
 

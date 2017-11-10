@@ -2,8 +2,8 @@
 
 namespace Bolt\Extension;
 
-use Bolt\Helpers\Arr;
-use Pimple as Container;
+use Bolt\Collection\Arr;
+use Pimple\Container;
 
 /**
  * Storage helpers.
@@ -37,23 +37,22 @@ trait StorageTrait
     {
         $app = $this->getContainer();
 
-        $app['storage'] = $app->share(
-            $app->extend(
-                'storage',
-                function ($entityManager) use ($app) {
-                    foreach ($this->registerRepositoryMappings() as $alias => $map) {
-                        if (Arr::isIndexedArray($map)) {
-                            // Usually caused by [entity, repo] instead of [entity => repo]
-                            throw new \RuntimeException(sprintf('Repository mapping for %s `%s` is not an associative array.', __CLASS__, $alias));
-                        }
-                        $app['storage.repositories'] += $map;
-                        $app['storage.metadata']->setDefaultAlias($app['schema.prefix'] . $alias, key($map));
-                        $entityManager->setRepository(key($map), current($map));
+        $app['storage'] = $app->extend(
+            'storage',
+            function ($entityManager) use ($app) {
+                foreach ($this->registerRepositoryMappings() as $alias => $map) {
+                    if (Arr::isIndexed($map)) {
+                        // Usually caused by [entity, repo] instead of [entity => repo]
+                        throw new \RuntimeException(sprintf('Repository mapping for %s `%s` is not an associative array.', __CLASS__, $alias));
                     }
-
-                    return $entityManager;
+                    $app['storage.repositories'] += $map;
+                    $app['storage.metadata']->setDefaultAlias($app['schema.prefix'] . $alias, key($map));
+                    $entityManager->setRepository(key($map), current($map));
+                    $entityManager->addEntityAlias($alias, key($map));
                 }
-            )
+
+                return $entityManager;
+            }
         );
     }
 

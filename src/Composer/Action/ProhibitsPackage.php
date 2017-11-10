@@ -2,6 +2,8 @@
 
 namespace Bolt\Composer\Action;
 
+use Bolt\Composer\Package\Dependency;
+
 /**
  * Shows which packages prevent the given package from being installed with
  * detailed information about why a package cannot be installed.
@@ -15,7 +17,7 @@ final class ProhibitsPackage extends AbstractDependencyAction
      * @param string $textConstraint
      * @param bool   $onlyLocal
      *
-     * @return array
+     * @return Dependency[]|null
      */
     public function execute($packageName, $textConstraint = '*', $onlyLocal = true)
     {
@@ -24,4 +26,3 @@ final class ProhibitsPackage extends AbstractDependencyAction
         return parent::execute($packageName, $textConstraint);
     }
 }
-

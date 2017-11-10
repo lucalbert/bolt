@@ -3,7 +3,7 @@
 use Codeception\Util\Fixtures;
 
 /**
- * Frontend navigation and render tests
+ * Frontend navigation and render tests.
  *
  * @author Gawain Lynch <gawain.lynch@gmail.com>
  */
@@ -30,7 +30,7 @@ class FrontendCest
     }
 
     /**
-     * Check the homepage
+     * Check the homepage.
      *
      * @param \AcceptanceTester $I
      */
@@ -57,13 +57,17 @@ class FrontendCest
     {
         $I->wantTo('see that there are no session cookies set.');
 
-        $I->amOnPage('/');
+        $I->resetCookie($this->tokenNames['session']);
 
+        $I->amOnPage('/');
+        $I->dontSeeCookie($this->tokenNames['session']);
+
+        $I->amOnPage('/thumbs/42x42c/koala.jpg');
         $I->dontSeeCookie($this->tokenNames['session']);
     }
 
     /**
-     * Check the about page and pagebind route
+     * Check the about page and pagebind route.
      *
      * @param \AcceptanceTester $I
      */
@@ -79,7 +83,7 @@ class FrontendCest
     }
 
     /**
-     * Check the contact page for templatefields
+     * Check the contact page for templatefields.
      *
      * @param \AcceptanceTester $I
      */
@@ -103,12 +107,12 @@ class FrontendCest
 
         $I->amOnPage('/resources');
 
-        $I->see('404 not found');
-        $I->see('The requested page was not found.');
+        $I->see('404 reasons to cry');
+        $I->see('Well, this is kind of embarrassing!');
     }
 
     /**
-     * Check a non-existing URL and check for our 404
+     * Check a non-existing URL and check for our 404.
      *
      * @param \AcceptanceTester $I
      */
@@ -118,12 +122,12 @@ class FrontendCest
 
         $I->amOnPage('/derp-a-derp');
 
-        $I->see('404 not found');
-        $I->see('The requested page was not found.');
+        $I->see('404 reasons to cry');
+        $I->see('Well, this is kind of embarrassing!');
     }
 
     /**
-     * Check that canonical links are the same on URIs by slug and ID
+     * Check that canonical links are the same on URIs by slug and ID.
      *
      * @param \AcceptanceTester $I
      */
@@ -140,7 +144,7 @@ class FrontendCest
 
     /**
      * Check that menus have a 'Home' with class 'first' and and active URI with
-     * the class 'active'
+     * the class 'active'.
      *
      * @param \AcceptanceTester $I
      */
@@ -154,5 +158,23 @@ class FrontendCest
 
         $I->amOnPage('/pages');
         $I->seeElement('li', ['class' => 'index-3 active']);
+    }
+
+    /**
+     * Check that Bolt doesn't allow profiler access when we're not logged in.
+     *
+     * @param \AcceptanceTester $I
+     */
+    public function checkNoProfilerTest(\AcceptanceTester $I)
+    {
+        $I->wantTo('see that there no profiler route available.');
+
+        $I->resetCookie($this->tokenNames['session']);
+
+        $I->amOnPage('/_profiler');
+        $I->seeResponseCodeIs(404);
+
+        $I->amOnPage('/_profiler/empty/search/results?limit=10');
+        $I->seeResponseCodeIs(404);
     }
 }

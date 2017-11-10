@@ -1,15 +1,18 @@
 <?php
+
 namespace Bolt\Controller;
 
 use Bolt\AccessControl\Token\Token;
+use Bolt\Response\TemplateResponse;
+use Bolt\Response\TemplateView;
 use Bolt\Routing\DefaultControllerClassAwareInterface;
 use Bolt\Storage\Entity;
 use Bolt\Storage\Repository;
 use Bolt\Translation\Translator as Trans;
 use Doctrine\DBAL\Exception\TableNotFoundException;
+use Silex\Api\ControllerProviderInterface;
 use Silex\Application;
 use Silex\ControllerCollection;
-use Silex\ControllerProviderInterface;
 use Symfony\Component\Form\Extension\Core\Type\FormType;
 use Symfony\Component\Form\Form;
 use Symfony\Component\Form\FormBuilderInterface;
@@ -21,6 +24,7 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 use Symfony\Component\Security\Csrf\CsrfToken;
+use Twig\Template as Template;
 
 /**
  * Base class for all controllers which mainly provides shortcut methods for
@@ -63,17 +67,53 @@ abstract class Base implements ControllerProviderInterface
     }
 
     /**
-     * Renders a template
+     * Renders a template.
      *
-     * @param string $template  the template name
-     * @param array  $variables array of context variables
-     * @param array  $globals   array of global variables
+     * @param string|string[] $template Template name(s)
+     * @param array           $context  Context variables
      *
-     * @return \Bolt\Response\BoltResponse
+     * @return TemplateResponse|TemplateView
      */
-    protected function render($template, array $variables = [], array $globals = [])
+    protected function render($template, array $context = [])
     {
-        return $this->app['render']->render($template, $variables, $globals);
+        $twig = $this->app['twig'];
+        /** @var Template $template */
+        $template = $twig->resolveTemplate($template);
+
+        $this->addResolvedRoute($context, $template->getTemplateName());
+
+        return new TemplateView($template->getTemplateName(), $context);
+    }
+
+    /**
+     * Update the route attributes to change the canonical URL generated.
+     *
+     * @param array  $context
+     * @param string $template
+     */
+    private function addResolvedRoute(array $context, $template)
+    {
+        if (!isset($context['record'])) {
+            return;
+        }
+
+        $content = $context['record'];
+        $request = $this->app['request_stack']->getCurrentRequest();
+
+        $homepage = $this->getOption('theme/homepage') ?: $this->getOption('general/homepage');
+        $uriID = $content->contenttype['singular_slug'] . '/' . $content->get('id');
+        $uriSlug = $content->contenttype['singular_slug'] . '/' . $content->get('slug');
+
+        if (($uriID === $homepage || $uriSlug === $homepage) && ($template === $this->getOption('general/homepage_template'))) {
+            $request->attributes->add(['_route' => 'homepage', '_route_params' => []]);
+
+            return;
+        }
+
+        list($routeName, $routeParams) = $content->getRouteNameAndParams();
+        if ($routeName) {
+            $request->attributes->add(['_route' => $routeName, '_route_params' => $routeParams]);
+        }
     }
 
     /**
@@ -119,7 +159,7 @@ abstract class Base implements ControllerProviderInterface
     }
 
     /**
-     * Shortcut for {@see UrlGeneratorInterface::generate}
+     * Shortcut for {@see UrlGeneratorInterface::generate}.
      *
      * @param string $name          The name of the route
      * @param array  $params        An array of parameters
@@ -165,7 +205,7 @@ abstract class Base implements ControllerProviderInterface
     /**
      * Returns the Entity Manager.
      *
-     * @return \Bolt\Storage\EntityManager
+     * @return \Bolt\Storage\EntityManager|\Bolt\Legacy\Storage
      */
     protected function storage()
     {
@@ -183,7 +223,7 @@ abstract class Base implements ControllerProviderInterface
     }
 
     /**
-     * Gets the flash logger
+     * Gets the flash logger.
      *
      * @return \Bolt\Logger\FlashLoggerInterface
      */
@@ -213,7 +253,6 @@ abstract class Base implements ControllerProviderInterface
     protected function validateCsrfToken($value = null, $id = 'bolt')
     {
         if (!$this->isCsrfTokenValid($value, $id)) {
-            //$this->app['logger.flash']->warning('The security token was incorrect. Please try again.');
             $this->abort(Response::HTTP_BAD_REQUEST, Trans::__('general.phrase.something-went-wrong'));
         }
     }
@@ -230,7 +269,7 @@ abstract class Base implements ControllerProviderInterface
     {
         $token = new CsrfToken($id, $value ?: $this->app['request_stack']->getCurrentRequest()->get('bolt_csrf_token'));
 
-        return $this->app['csrf']->isTokenValid($token);
+        return $this->app['csrf.token_manager']->isTokenValid($token);
     }
 
     /**
@@ -300,13 +339,13 @@ abstract class Base implements ControllerProviderInterface
             return false;
         }
         /** @var Repository\UsersRepository $repo */
-        $repo = $this->storage()->getRepository('Bolt\Storage\Entity\Users');
+        $repo = $this->storage()->getRepository(Entity\Users::class);
 
         return $repo->getUser($userId);
     }
 
     /**
-     * Shortcut for {@see \Bolt\AccessControl\Permissions::isAllowed}
+     * Shortcut for {@see \Bolt\AccessControl\Permissions::isAllowed}.
      *
      * @param string       $what
      * @param mixed        $user        The user to check permissions against.
@@ -338,20 +377,26 @@ abstract class Base implements ControllerProviderInterface
     }
 
     /**
-     * Shortcut for {@see \Bolt\Legacy\Storage::getContent()}
+     * Shortcut for {@see \Bolt\Legacy\Storage::getContent()}.
      *
-     * @param string $textquery
+     * @param string $textQuery
      * @param array  $parameters
      * @param array  $pager
-     * @param array  $whereparameters
+     * @param array  $whereParameters
      *
      * @return \Bolt\Legacy\Content|\Bolt\Legacy\Content[]
      *
      * @see \Bolt\Legacy\Storage::getContent()
      */
-    protected function getContent($textquery, $parameters = [], &$pager = [], $whereparameters = [])
+    protected function getContent($textQuery, $parameters = [], &$pager = [], $whereParameters = [])
     {
-        return $this->storage()->getContent($textquery, $parameters, $pager, $whereparameters);
+        $isLegacy = $this->getOption('general/compatibility/setcontent_legacy', true);
+        if ($isLegacy) {
+            return $this->storage()->getContent($textQuery, $parameters, $pager, $whereParameters);
+        }
+        $params = array_merge($parameters, $whereParameters);
+
+        return  $this->app['query']->getContent($textQuery, $params);
     }
 
     /**
@@ -429,13 +474,5 @@ abstract class Base implements ControllerProviderInterface
     protected function createQueryBuilder()
     {
         return $this->app['db']->createQueryBuilder();
-    }
-
-    /**
-     * @return \Bolt\Configuration\ResourceManager
-     */
-    protected function resources()
-    {
-        return $this->app['resources'];
     }
 }

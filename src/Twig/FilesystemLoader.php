@@ -6,14 +6,16 @@ use Bolt\Filesystem\Exception\ExceptionInterface;
 use Bolt\Filesystem\FilesystemInterface;
 use Bolt\Filesystem\Handler\DirectoryInterface;
 use Bolt\Filesystem\Handler\FileInterface;
-use Twig_Error_Loader as LoaderError;
+use Twig\Error\LoaderError;
+use Twig\Loader\FilesystemLoader as TwigFilesystemLoader;
+use Twig\Source;
 
 /**
  * Loads templates from a Bolt\Filesystem interface.
  *
  * @author Carson Full <carsonfull@gmail.com>
  */
-class FilesystemLoader extends \Twig_Loader_Filesystem
+class FilesystemLoader extends TwigFilesystemLoader
 {
     /** @var FilesystemInterface */
     protected $filesystem;
@@ -44,6 +46,16 @@ class FilesystemLoader extends \Twig_Loader_Filesystem
     public function prependPath($path, $namespace = self::MAIN_NAMESPACE)
     {
         $this->prependDir($this->filesystem->getDir($path), $namespace);
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getSourceContext($name)
+    {
+        $file = $this->findTemplate($name);
+
+        return new Source($file->read(), $name);
     }
 
     /**
@@ -138,8 +150,6 @@ class FilesystemLoader extends \Twig_Loader_Filesystem
      */
     protected function findTemplate($name, $throw = true)
     {
-        $name = $this->normalizeName($name);
-
         if (isset($this->cache[$name])) {
             return $this->cache[$name];
         }
@@ -151,8 +161,6 @@ class FilesystemLoader extends \Twig_Loader_Filesystem
 
             throw new LoaderError($this->errorCache[$name]);
         }
-
-        $this->validateName($name);
 
         list($namespace, $shortName) = $this->parseName($name);
 
@@ -192,5 +200,24 @@ class FilesystemLoader extends \Twig_Loader_Filesystem
         }
 
         throw new LoaderError($this->errorCache[$name]);
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    private function parseName($name, $default = self::MAIN_NAMESPACE)
+    {
+        if (isset($name[0]) && '@' == $name[0]) {
+            if (false === $pos = strpos($name, '/')) {
+                throw new LoaderError(sprintf('Malformed namespaced template name "%s" (expecting "@namespace/template_name").', $name));
+            }
+
+            $namespace = substr($name, 1, $pos - 1);
+            $shortname = substr($name, $pos + 1);
+
+            return array($namespace, $shortname);
+        }
+
+        return array($default, $name);
     }
 }

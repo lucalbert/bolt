@@ -1,7 +1,8 @@
 <?php
+
 namespace Bolt\Asset;
 
-use Bolt\Helpers\Str;
+use Bolt\Common\Str;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -80,7 +81,7 @@ class Injector
         if ($matches = $this->getMatches($rawHtml, '<head', true, false)) {
             $replacement = sprintf("%s\n%s\t%s", $matches[0], $matches[1], (string) $asset);
 
-            return Str::replaceFirst($matches[0], $replacement, $rawHtml);
+            return Str::replaceFirst($rawHtml, $matches[0], $replacement);
         }
 
         return $this->tagSoup($asset, $rawHtml);
@@ -100,7 +101,7 @@ class Injector
         if ($matches = $this->getMatches($rawHtml, '</head', false, false)) {
             $replacement = sprintf("%s\t%s\n%s", $matches[1], (string) $asset, $matches[0]);
 
-            return Str::replaceFirst($matches[0], $replacement, $rawHtml);
+            return Str::replaceFirst($rawHtml, $matches[0], $replacement);
         }
 
         return $this->tagSoup($asset, $rawHtml);
@@ -120,7 +121,7 @@ class Injector
         if ($matches = $this->getMatches($rawHtml, '<body', true, false)) {
             $replacement = sprintf("%s\n%s\t%s", $matches[0], $matches[1], (string) $asset);
 
-            return Str::replaceFirst($matches[0], $replacement, $rawHtml);
+            return Str::replaceFirst($rawHtml, $matches[0], $replacement);
         }
 
         return $this->tagSoup($asset, $rawHtml);
@@ -140,7 +141,7 @@ class Injector
         if ($matches = $this->getMatches($rawHtml, '</body', false, false)) {
             $replacement = sprintf("%s\t%s\n%s", $matches[1], $asset, $matches[0]);
 
-            return Str::replaceFirst($matches[0], $replacement, $rawHtml);
+            return Str::replaceFirst($rawHtml, $matches[0], $replacement);
         }
 
         return $this->tagSoup($asset, $rawHtml);
@@ -160,7 +161,7 @@ class Injector
         if ($matches = $this->getMatches($rawHtml, '</html', false, false)) {
             $replacement = sprintf("%s\t%s\n%s", $matches[1], $asset, $matches[0]);
 
-            return Str::replaceFirst($matches[0], $replacement, $rawHtml);
+            return Str::replaceFirst($rawHtml, $matches[0], $replacement);
         }
 
         return $this->tagSoup($asset, $rawHtml);
@@ -180,7 +181,7 @@ class Injector
             $last = count($matches[0]) - 1;
             $replacement = sprintf("%s\n%s%s", $matches[0][$last], $matches[1][$last], (string) $asset);
 
-            return Str::replaceFirst($matches[0][$last], $replacement, $rawHtml);
+            return Str::replaceFirst($rawHtml, $matches[0][$last], $replacement);
         }
 
         return $this->headTagEnd($asset, $rawHtml);
@@ -200,7 +201,7 @@ class Injector
             $last = count($matches[0]) - 1;
             $replacement = sprintf("%s\n%s%s", $matches[0][$last], $matches[1][$last], (string) $asset);
 
-            return Str::replaceFirst($matches[0][$last], $replacement, $rawHtml);
+            return Str::replaceFirst($rawHtml, $matches[0][$last], $replacement);
         }
 
         return $this->headTagEnd($asset, $rawHtml);
@@ -219,7 +220,7 @@ class Injector
         if ($matches = $this->getMatches($rawHtml, '<link', true, false)) {
             $replacement = sprintf("%s%s\n%s\t%s", $matches[1], $asset, $matches[0], $matches[1]);
 
-            return Str::replaceFirst($matches[0], $replacement, $rawHtml);
+            return Str::replaceFirst($rawHtml, $matches[0], $replacement);
         }
 
         return $this->tagSoup($asset, $rawHtml);
@@ -238,7 +239,7 @@ class Injector
         if ($matches = $this->getMatches($rawHtml, '<script', true, false)) {
             $replacement = sprintf("%s%s\n%s\t%s", $matches[1], $asset, $matches[0], $matches[1]);
 
-            return Str::replaceFirst($matches[0], $replacement, $rawHtml);
+            return Str::replaceFirst($rawHtml, $matches[0], $replacement);
         }
 
         return $this->tagSoup($asset, $rawHtml);
@@ -270,7 +271,7 @@ class Injector
             $last = count($matches[0]) - 1;
             $replacement = sprintf("%s\n%s%s", $matches[0][$last], $matches[1][$last], (string) $asset);
 
-            return Str::replaceFirst($matches[0][$last], $replacement, $rawHtml);
+            return Str::replaceFirst($rawHtml, $matches[0][$last], $replacement);
         } elseif ($insidehead) {
             // Second attempt: entire document
             return $this->jsTagsAfter($asset, $rawHtml, false);
@@ -287,7 +288,7 @@ class Injector
      * @param boolean $matchRemainder TRUE matches the remainder of the line, not just the tag - (.*)
      * @param boolean $matchAll       TRUE returns all matched instances - preg_match_all()
      *
-     * @return string[]
+     * @return string[]|false
      */
     private function getMatches($rawHtml, $htmlTag, $matchRemainder, $matchAll)
     {
@@ -300,6 +301,8 @@ class Injector
         } elseif (!$matchAll && preg_match($regex, $rawHtml, $matches)) {
             return $matches;
         }
+
+        return false;
     }
 
     /**

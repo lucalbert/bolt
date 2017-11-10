@@ -3,8 +3,8 @@
 namespace Bolt\Extension;
 
 use Bolt\Filesystem\Handler\DirectoryInterface;
-use Pimple as Container;
-use Silex\ServiceProviderInterface;
+use Pimple\Container;
+use Pimple\ServiceProviderInterface;
 
 /**
  * ExtensionInterface.
@@ -67,7 +67,7 @@ interface ExtensionInterface
     public function setWebDirectory(DirectoryInterface $directory);
 
     /**
-     * Returns a unique identifier for the extension, such as: Vendor/Name
+     * Returns a unique identifier for the extension, such as: Vendor/Name.
      *
      * @return string
      */

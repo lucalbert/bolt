@@ -2,7 +2,6 @@
 
 namespace Bolt\Storage\EventProcessor;
 
-use Bolt\Config;
 use Bolt\Events\StorageEvent;
 use Bolt\Exception\InvalidRepositoryException;
 use Bolt\Exception\StorageException;
@@ -30,57 +29,57 @@ class TimedRecord
 
     /** @var array */
     protected $contentTypeNames;
-    /** @var  EntityManagerInterface */
+    /** @var EntityManagerInterface */
     protected $em;
-    /** @var Config */
-    protected $config;
     /** @var CacheProvider */
     protected $cache;
     /** @var EventDispatcherInterface */
     protected $dispatcher;
     /** @var LoggerInterface */
     protected $systemLogger;
+    /** @var integer */
+    protected $interval;
 
     /**
      * Constructor.
      *
      * @param array                    $contentTypeNames
      * @param EntityManagerInterface   $em
-     * @param Config                   $config
      * @param CacheProvider            $cache
      * @param EventDispatcherInterface $dispatcher
      * @param LoggerInterface          $systemLogger
+     * @param integer                  $interval
      */
     public function __construct(
         array $contentTypeNames,
         EntityManagerInterface $em,
-        Config $config,
         CacheProvider $cache,
         EventDispatcherInterface $dispatcher,
-        LoggerInterface $systemLogger
+        LoggerInterface $systemLogger,
+        $interval
     ) {
         $this->contentTypeNames = $contentTypeNames;
         $this->em = $em;
-        $this->config = $config;
         $this->cache = $cache;
         $this->dispatcher = $dispatcher;
         $this->systemLogger = $systemLogger;
+        $this->interval = $interval;
     }
 
     /**
-     * Get the timer for publishing timed records
+     * Get the timer for publishing timed records.
      */
     public function isDuePublish()
     {
-        return !$this->cache->fetch(self::CACHE_KEY_PUBLISH);
+        return !$this->cache->contains(self::CACHE_KEY_PUBLISH);
     }
 
     /**
-     * Get the timer for publishing timed records
+     * Get the timer for publishing timed records.
      */
     public function isDueHold()
     {
-        return !$this->cache->fetch(self::CACHE_KEY_HOLD);
+        return !$this->cache->contains(self::CACHE_KEY_HOLD);
     }
 
     /**
@@ -89,9 +88,9 @@ class TimedRecord
     public function publishTimedRecords()
     {
         foreach ($this->contentTypeNames as $contentTypeName) {
-            $this->timedHandleRecords($contentTypeName, 'publish');
+            $this->timedHandleRecords($contentTypeName, 'timed');
         }
-        $this->cache->save(self::CACHE_KEY_PUBLISH, true, $this->config->get('general/caching/duration', 10));
+        $this->cache->save(self::CACHE_KEY_PUBLISH, true, $this->interval);
     }
 
     /**
@@ -102,7 +101,7 @@ class TimedRecord
         foreach ($this->contentTypeNames as $contentTypeName) {
             $this->timedHandleRecords($contentTypeName, 'hold');
         }
-        $this->cache->save(self::CACHE_KEY_HOLD, true, $this->config->get('general/caching/duration', 10));
+        $this->cache->save(self::CACHE_KEY_HOLD, true, $this->interval);
     }
 
     /**
@@ -113,8 +112,8 @@ class TimedRecord
      */
     private function timedHandleRecords($contentTypeName, $type)
     {
-        /** @var ContentRepository $contentRepo */
         try {
+            /** @var ContentRepository $contentRepo */
             $contentRepo = $this->em->getRepository($contentTypeName);
         } catch (InvalidRepositoryException $e) {
             // ContentType doesn't have a repository
@@ -122,14 +121,8 @@ class TimedRecord
         }
 
         $types = [
-            'timed' => [
-                'target' => 'published',
-                'legacy' => 'publish',
-            ],
-            'hold' => [
-                'target' => 'held',
-                'legacy' => 'depublish',
-            ],
+            'timed' => ['target' => 'published'],
+            'hold' => ['target' => 'held'],
         ];
 
         try {
@@ -140,7 +133,7 @@ class TimedRecord
         /** @var Content $content */
         foreach ($records as $content) {
             $content->set('status', $types[$type]['target']);
-            $this->save($contentRepo, $content, $type, $types[$type]['legacy']);
+            $this->save($contentRepo, $content, $type);
         }
     }
 
@@ -150,13 +143,12 @@ class TimedRecord
      * @param ContentRepository $contentRepo
      * @param Content           $content
      * @param string            $type
-     * @param string            $legacyType
      */
-    private function save(ContentRepository $contentRepo, Content $content, $type, $legacyType)
+    private function save(ContentRepository $contentRepo, Content $content, $type)
     {
         try {
             $contentRepo->save($content);
-            $this->dispatch($content, $type, $legacyType);
+            $this->dispatch($content, $type);
         } catch (DBALException $e) {
             $contentTypeName = $contentRepo->getClassMetadata()->getBoltName();
             $message = "Timed update of records for $contentTypeName failed: " . $e->getMessage();
@@ -170,19 +162,12 @@ class TimedRecord
      *
      * @param Content $content
      * @param string  $type
-     * @param string  $legacyType
      */
-    private function dispatch(Content $content, $type, $legacyType)
+    private function dispatch(Content $content, $type)
     {
         $event = new StorageEvent($content, ['contenttype' => $content->getContenttype(), 'create' => false]);
         try {
             $this->dispatcher->dispatch("timed.$type", $event);
-        } catch (\Exception $e) {
-            $this->systemLogger->critical(sprintf('Dispatch handling failed for %s.', $content->getContenttype()), ['event' => 'exception', 'exception' => $e]);
-        }
-        try {
-            /** @deprecated Deprecated since 3.1, to be removed in 4.0. */
-            $this->dispatcher->dispatch("timed.$legacyType", $event);
         } catch (\Exception $e) {
             $this->systemLogger->critical(sprintf('Dispatch handling failed for %s.', $content->getContenttype()), ['event' => 'exception', 'exception' => $e]);
         }
@@ -202,16 +187,14 @@ class TimedRecord
     {
         /** @var QueryBuilder $query */
         $query = $contentRepo->createQueryBuilder('t')
-            ->select('t.id')
             ->andWhere('t.status = :status')
             ->setParameter('currenttime', Carbon::now(), Type::DATETIME)
         ;
 
-
-        if ($type === 'publish') {
-            $this->getTimedQuery($query);
+        if ($type === 'timed') {
+            $this->getTimedPublishQuery($query);
         } elseif ($type === 'hold') {
-            $this->getPublishedQuery($query);
+            $this->getHoldQuery($query);
         } else {
             throw new StorageException(sprintf('Invalid type "%s" for timed record processing.', $type));
         }
@@ -224,7 +207,7 @@ class TimedRecord
      *
      * @param QueryBuilder $query
      */
-    private function getTimedQuery(QueryBuilder $query)
+    private function getTimedPublishQuery(QueryBuilder $query)
     {
         $query
             ->where('status = :status')
@@ -238,7 +221,7 @@ class TimedRecord
      *
      * @param QueryBuilder $query
      */
-    private function getPublishedQuery(QueryBuilder $query)
+    private function getHoldQuery(QueryBuilder $query)
     {
         $query
             ->where('datedepublish <= :currenttime')

@@ -1,4 +1,5 @@
 <?php
+
 namespace Bolt\Storage\Database\Schema\Table;
 
 use Bolt\Exception\StorageException;
@@ -108,16 +109,6 @@ abstract class BaseTable
         }
 
         return $this->aliasName;
-    }
-
-    /**
-     * Default value for TEXT fields, differs per platform.
-     *
-     * @return string|null
-     */
-    protected function getTextDefault()
-    {
-        return '';
     }
 
     /**

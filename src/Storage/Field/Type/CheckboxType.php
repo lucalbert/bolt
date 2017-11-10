@@ -1,4 +1,5 @@
 <?php
+
 namespace Bolt\Storage\Field\Type;
 
 use Doctrine\DBAL\Types\Type;
@@ -24,6 +25,6 @@ class CheckboxType extends FieldTypeBase
      */
     public function getStorageType()
     {
-        return Type::getType('string');
+        return Type::getType('boolean');
     }
 }

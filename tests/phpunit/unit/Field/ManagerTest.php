@@ -1,6 +1,8 @@
 <?php
+
 namespace Bolt\Tests\Field;
 
+use Bolt\Storage\Field\Base;
 use Bolt\Storage\Field\Manager;
 use Bolt\Tests\BoltUnitTest;
 
@@ -11,7 +13,7 @@ use Bolt\Tests\BoltUnitTest;
  */
 class ManagerTest extends BoltUnitTest
 {
-    public function testManagerDefaultsSetup()
+    public function testLegacyManagerDefaultsSetup()
     {
         $manager = new Manager();
         $this->assertTrue($manager->has('text'));
@@ -34,9 +36,14 @@ class ManagerTest extends BoltUnitTest
         $this->assertTrue($manager->has('slug'));
     }
 
-    public function testAddingFetchingfields()
+    public function testLegacyAddingFetchingfields()
     {
-        $field = $this->getMock('Bolt\Storage\Field\Base', null, ['test', 'test.twig']);
+        /** @var Base $field */
+        $field = $this->getMockBuilder(Base::class)
+            ->setMethods(null)
+            ->setConstructorArgs(['test', 'test.twig'])
+            ->getMock()
+        ;
         $manager = new Manager();
         $manager->addField($field);
         $this->assertTrue($manager->has('test'));

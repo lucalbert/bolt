@@ -54,14 +54,13 @@ abstract class AbstractDependencyAction extends BaseAction
             $versionParser = new VersionParser();
             $constraint = $versionParser->parseConstraints($textConstraint);
         }
-        $extra = $constraint !== null ? sprintf(' in versions %s "%s"', $this->inverted ? 'not matching' : 'matching', $textConstraint) : '';
 
         // Resolve dependencies
         /** @var InstalledFilesystemRepository $repository */
         $repository = $this->getComposer()->getRepositoryManager()->getLocalRepository();
         $results = $repository->getDependents($needles, $constraint, $this->inverted, $this->recursive);
         if (empty($results)) {
-            // sprintf('There is no installed package depending on "%s"%s', $packageName, $extra),
+            // There is no installed package depending on $packageName
             return null;
         }
 
@@ -132,7 +131,9 @@ abstract class AbstractDependencyAction extends BaseAction
         }
 
         // Include replaced packages for inverted lookups as they are then the actual starting point to consider
-        $mapCb = function (Link $link) { return $link->getTarget(); };
+        $mapCb = function (Link $link) {
+            return $link->getTarget();
+        };
         foreach ($packages as $package) {
             $needles = array_merge(
                 $needles,
@@ -148,7 +149,7 @@ abstract class AbstractDependencyAction extends BaseAction
      *
      * @param array $results
      *
-     * @return array
+     * @return Dependency[]
      */
     private function getDependencies(array $results)
     {

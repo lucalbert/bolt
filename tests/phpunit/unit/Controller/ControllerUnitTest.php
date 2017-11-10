@@ -1,4 +1,5 @@
 <?php
+
 namespace Bolt\Tests\Controller;
 
 use Bolt\Configuration\Validation\Validator;
@@ -30,6 +31,11 @@ abstract class ControllerUnitTest extends BoltUnitTest
         return $this->getApp()->offsetGet('request');
     }
 
+    /**
+     * {@inheritdoc}
+     *
+     * @return \Silex\Application
+     */
     protected function getApp($boot = true)
     {
         if (!$this->app) {
@@ -42,13 +48,16 @@ abstract class ControllerUnitTest extends BoltUnitTest
     protected function makeApp()
     {
         $app = parent::makeApp();
-        $app->initialize();
-        $app['twig.loader'] = new \Twig_Loader_Chain([new \Twig_Loader_String()]);
 
-        $verifier = new Validator($app['controller.exception'], $app['config'], $app['resources']);
+        $verifier = new Validator(
+            $app['config'],
+            $app['path_resolver'],
+            $app['logger.flash']
+        );
         $verifier->checks();
 
         $app->boot();
+        $app->flush();
 
         return $app;
     }

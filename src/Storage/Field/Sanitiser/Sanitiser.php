@@ -41,6 +41,15 @@ class Sanitiser implements SanitiserInterface
             ? $this->getWyswigAllowedTags()
             : $this->getAllowedTags();
 
+        // Check if the input containts encoded HTML entities. If it does, we'll
+        // need to decode the output later. This is because the sanitiser will
+        // convert entities in the cleaned HTML, if they aren't present yet.
+        // Ideally we'd fix this upstream by using \DomDocument::substituteEntities,
+        // but that setting is disregarded in PHP's implementation at least.
+        // This leaves us no choice but to implement this crude, albeit contained
+        // fix in this location.
+        $needsDecodeEntities = ($value === html_entity_decode($value, ENT_NOQUOTES));
+
         $maid = new Maid(
             [
                 'output-format'   => 'html',
@@ -49,7 +58,13 @@ class Sanitiser implements SanitiserInterface
             ]
         );
 
-        return $maid->clean($value);
+        $output = $maid->clean($value);
+
+        if ($needsDecodeEntities) {
+            $output = html_entity_decode($output, ENT_NOQUOTES);
+        }
+
+        return $output;
     }
 
     /**
@@ -92,7 +107,7 @@ class Sanitiser implements SanitiserInterface
      * Return a list of allowed tags needed for WYSIWYG field types.
      *
      * For HTML fields we want to override a few tags, e.g, it makes
-     * no sense to disallow `<embed>` if we have `embed: true` in
+     * no sense to disallow `<iframe>` if we have `embed: true` in
      * config.yml.
      *
      * @return array
@@ -130,6 +145,11 @@ class Sanitiser implements SanitiserInterface
         if ($this->isWysiwygEnabled('embed')) {
             // Note: Only <iframe>. Not <script>, <embed> or <object>.
             $allowedBecauseWysiwyg[] = 'iframe';
+            // We also need to add a few attributes as well.
+            $this->setAllowedAttributes(array_unique(array_merge(
+                    $this->getAllowedAttributes(),
+                    ['src', 'width', 'height', 'frameborder', 'allowfullscreen', 'scrolling']))
+            );
         }
         if ($this->isWysiwygEnabled('ruler')) {
             $allowedBecauseWysiwyg[] = 'hr';

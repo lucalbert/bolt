@@ -2,6 +2,9 @@
 
 namespace Bolt\Storage\Field\Type;
 
+use Bolt\Common\Deprecated;
+use Bolt\Common\Json;
+use Bolt\Storage\CaseTransformTrait;
 use Bolt\Storage\EntityManager;
 use Bolt\Storage\Field\FieldInterface;
 use Bolt\Storage\Field\Sanitiser\SanitiserAwareInterface;
@@ -21,11 +24,22 @@ use Doctrine\DBAL\Types\Type;
  */
 abstract class FieldTypeBase implements FieldTypeInterface, FieldInterface
 {
+    use CaseTransformTrait;
+
+    /** @var string[] */
     public $mapping;
 
+    /** @var EntityManager */
     protected $em;
+    /** @var AbstractPlatform */
     protected $platform;
 
+    /**
+     * Constructor.
+     *
+     * @param array              $mapping
+     * @param EntityManager|null $em
+     */
     public function __construct(array $mapping = [], EntityManager $em = null)
     {
         $this->mapping = $mapping;
@@ -36,7 +50,7 @@ abstract class FieldTypeBase implements FieldTypeInterface, FieldInterface
     }
 
     /**
-     * Returns the platform
+     * Returns the platform.
      *
      * @return AbstractPlatform
      */
@@ -46,7 +60,7 @@ abstract class FieldTypeBase implements FieldTypeInterface, FieldInterface
     }
 
     /**
-     * Sets the current platform to an instance of AbstractPlatform
+     * Sets the current platform to an instance of AbstractPlatform.
      *
      * @param AbstractPlatform $platform
      */
@@ -78,7 +92,7 @@ abstract class FieldTypeBase implements FieldTypeInterface, FieldInterface
         $key = $this->mapping['fieldname'];
 
         $qb = &$queries[0];
-        $valueMethod = 'serialize' . ucfirst($attribute);
+        $valueMethod = 'serialize' . ucfirst($this->camelize($attribute));
         $value = $entity->$valueMethod();
 
         if ($this instanceof SanitiserAwareInterface && is_string($value)) {
@@ -86,7 +100,7 @@ abstract class FieldTypeBase implements FieldTypeInterface, FieldInterface
             $value = $this->getSanitiser()->sanitise($value, $isWysiwyg);
         }
 
-        $type = $this->getStorageType();
+        $type = $this->getStorageTypeObject();
 
         if (null !== $value) {
             $value = $type->convertToDatabaseValue($value, $this->getPlatform());
@@ -104,7 +118,7 @@ abstract class FieldTypeBase implements FieldTypeInterface, FieldInterface
     public function hydrate($data, $entity)
     {
         $key = $this->mapping['fieldname'];
-        $type = $this->getStorageType();
+        $type = $this->getStorageTypeObject();
         $val = isset($data[$key]) ? $data[$key] : null;
         if ($val !== null) {
             $value = $type->convertToPHPValue($val, $this->getPlatform());
@@ -126,16 +140,17 @@ abstract class FieldTypeBase implements FieldTypeInterface, FieldInterface
     public function set($entity, $value)
     {
         $key = $this->mapping['fieldname'];
-        if (!$value && isset($this->mapping['data']['default'])) {
+        if ($value === null && isset($this->mapping['data']['default'])) {
             $value = $this->mapping['data']['default'];
         }
         $entity->$key = $value;
     }
 
     /**
-     * Reads the current value of the field from an entity and returns value
+     * Reads the current value of the field from an entity and returns value.
      *
      * @param $entity
+     *
      * @return mixed
      */
     public function get($entity)
@@ -173,16 +188,34 @@ abstract class FieldTypeBase implements FieldTypeInterface, FieldInterface
     }
 
     /**
+     * Helper method to bridge compatibility between old and new Field interfaces. Previously a string storage
+     * type was allowed whereas new behaviour is to expect a Type object.
+     *
+     * @return Type
+     */
+    protected function getStorageTypeObject()
+    {
+        $type = $this->getStorageType();
+        if (is_string($type)) {
+            $type = Type::getType($type);
+        }
+
+        return $type;
+    }
+
+    /**
      * @deprecated
      * Here to maintain compatibility with the old interface
      */
     public function getStorageOptions()
     {
+        Deprecated::method();
+
         return [];
     }
 
     /**
-     * Gets the entity attribute name to be used for reading / persisting
+     * Gets the entity attribute name to be used for reading / persisting.
      *
      * @return string
      */
@@ -196,57 +229,28 @@ abstract class FieldTypeBase implements FieldTypeInterface, FieldInterface
     }
 
     /**
-     * Provides a template that is able to render the field
+     * Provides a template that is able to render the field.
      *
      * @deprecated
      */
     public function getTemplate()
     {
+        Deprecated::method();
+
         return '@bolt/editcontent/fields/_' . $this->getName() . '.twig';
     }
 
     /**
      * Check if a value is a JSON string.
      *
-     * @param mixed $value
+     * @param string $value
      *
      * @return boolean
      */
     protected function isJson($value)
     {
-        if (!is_string($value)) {
-            return false;
-        }
-        json_decode($value);
+        Deprecated::method(3.4, '\Bolt\Common\Json::test');
 
-        return json_last_error() === JSON_ERROR_NONE;
-    }
-
-    protected function normalizeData($data, $field)
-    {
-        $normalized = [];
-
-        foreach ($data as $key => $value) {
-            if (strpos($key, '_') === 0) {
-                $path = explode('_', $key);
-                if (isset($path[1]) && isset($path[2]) && $path[1] == $field) {
-                    $normalized[$path[2]] = $value;
-                }
-            }
-        }
-
-        $compiled = [];
-
-        foreach ($normalized as $key => $value) {
-            if ($value === null) {
-                continue;
-            }
-            foreach (explode(',', $value) as $i => $val) {
-                $compiled[$i][$key] = $val;
-            }
-        };
-        $compiled = array_unique($compiled, SORT_REGULAR);
-
-        return $compiled;
+        return Json::test($value);
     }
 }

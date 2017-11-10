@@ -8,9 +8,6 @@ use Symfony\Component\HttpFoundation\Response;
 /**
  * Boot initialisation exception.
  *
- * This could be loaded on a very old version of PHP so no syntax/methods over
- * PHP 5.2 in this file.
- *
  * @author Gawain Lynch <gawain.lynch@gmail.com>
  */
 class BootException extends RuntimeException
@@ -72,6 +69,8 @@ class BootException extends RuntimeException
 
     /**
      * Exception due to a missing vendor/autoload.php file.
+     *
+     * @return static
      */
     public static function earlyExceptionComposer()
     {
@@ -82,7 +81,7 @@ Make sure you've installed the required components with Composer.
 EOM;
         echo sprintf(static::getEarlyExceptionHtml(), 'Bolt - Installation Incomplete', $message, static::getHintsComposer());
 
-        throw new static(strip_tags($message));
+        return new static(strip_tags($message));
     }
 
     /**
@@ -91,7 +90,7 @@ EOM;
     public static function earlyExceptionVersion()
     {
         $message = <<<EOM
-Bolt requires PHP <u>5.5.9</u>, or higher. 
+Bolt requires PHP <u>7.0.8</u>, or higher. 
 <br><br>
 You are running PHP <u>%s</u>, so Bolt will not run on your current setup.
 EOM;

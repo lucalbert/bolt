@@ -3,7 +3,7 @@
 use Codeception\Util\Locator;
 
 /**
- * Backend 'editor' tests
+ * Backend 'editor' tests.
  *
  * @author Gawain Lynch <gawain.lynch@gmail.com>
  */
@@ -82,7 +82,7 @@ class BackendEditorCest extends AbstractAcceptanceTest
         $I->fillField('#teaser', 'Woop woop woop! Crazy nice stuff inside!');
         $I->fillField('#body',   'Take it, take it! I have three more of these!');
 
-        $I->click('Save Page');
+        $I->submitForm('form[name="content_edit"]', ['content_edit' => ['save' => 1]]);
         $I->see('The new Page has been saved.');
 
         $I->see('A page I made');
@@ -90,25 +90,7 @@ class BackendEditorCest extends AbstractAcceptanceTest
     }
 
     /**
-     * Check that the PRE_SAVE and POST_SAVE storage event triggered on create.
-     *
-     * @param \AcceptanceTester $I
-     */
-    public function checkCreateRecordsEventTest(\AcceptanceTester $I)
-    {
-        $I->wantTo('Check the PRE_SAVE & POST_SAVE StorageEvent triggered correctly on create');
-
-        // Set up the browser
-        $this->setLoginCookies($I);
-        $I->amOnPage('/bolt/editcontent/pages/1');
-
-        $I->seeInField('#title',  'A PAGE I MADE');
-        $I->see('Snuck in to teaser during PRE_SAVE on create');
-        $I->see('Snuck in to body during POST_SAVE on create');
-    }
-
-    /**
-     * Check that the editor can't publish Entries
+     * Check that the editor can't publish Entries.
      *
      * @param \AcceptanceTester $I
      */
@@ -127,7 +109,7 @@ class BackendEditorCest extends AbstractAcceptanceTest
         $I->dontSeeInField('#statusselect', 'published');
 
         // Save the page and return to the overview
-        $I->click('Save & return to overview');
+        $I->submitForm('form[name="content_edit"]', ['content_edit' => ['save_return' => 1]]);
         $I->see('Actions for Pages', '.panel-heading');
 
         // Check the 'Publish page' context menu option isn't shown
@@ -138,25 +120,7 @@ class BackendEditorCest extends AbstractAcceptanceTest
     }
 
     /**
-     * Check that the PRE_SAVE and POST_SAVE storage event triggered on save.
-     *
-     * @param \AcceptanceTester $I
-     */
-    public function checkSaveRecordsEventTest(\AcceptanceTester $I)
-    {
-        $I->wantTo('Check the PRE_SAVE & POST_SAVE StorageEvent triggered correctly on save');
-
-        // Set up the browser
-        $this->setLoginCookies($I);
-        $I->amOnPage('/bolt/editcontent/pages/1');
-
-        $I->seeInField('#title',  'A Page I Made');
-        $I->see('Added to teaser during PRE_SAVE on save');
-        $I->see('Added to body during POST_SAVE on save');
-    }
-
-    /**
-     * Check that the editor can't create Entries
+     * Check that the editor can't create Entries.
      *
      * @param \AcceptanceTester $I
      */
@@ -195,7 +159,7 @@ class BackendEditorCest extends AbstractAcceptanceTest
         $I->fillField('#teaser', $teaser);
         $I->fillField('#body',   $body);
 
-        $I->click('Save Page', '#savecontinuebutton');
+        $I->submitForm('form[name="content_edit"]', ['content_edit' => ['save' => 1]]);
 
         $I->see('The new Page has been saved.');
         $I->see("Easy for editors, and a developer's dream cms");
@@ -205,13 +169,13 @@ class BackendEditorCest extends AbstractAcceptanceTest
     }
 
     /**
-     * Create a contact page with templatefields
+     * Create a contact page with TemplateFields.
      *
      * @param \AcceptanceTester $I
      */
     public function checkTemplateFieldsTest(\AcceptanceTester $I)
     {
-        $I->wantTo('Create a contact page with templatefields');
+        $I->wantTo('Create a contact page with TemplateFields');
 
         // Set up the browser
         $this->setLoginCookies($I);
@@ -222,26 +186,65 @@ class BackendEditorCest extends AbstractAcceptanceTest
 
         $I->fillField('#title',       'Contact Page');
         $I->fillField('#slug',        'contact');
-        $I->selectOption('#template', 'extrafields.twig');
+        $I->selectOption('#template', 'page.twig');
 
-        $I->click('Save Page', '#savecontinuebutton');
+        $I->submitForm('form[name="content_edit"]', ['content_edit' => ['save' => 1]]);
         $I->see('The new Page has been saved.');
-        $I->click('CONTACT PAGE');
+        $I->click('Contact Page');
 
-        // Page has been saved, fill templatefields
+        // Page has been saved, fill TemplateFields
         $I->see('Template', 'a[data-toggle=tab]');
 
-        $I->fillField('#templatefields-section_1', 'This is the contact text');
-        $I->click('Save Page');
+        $I->fillField('#templatefields-text', 'This is the contact text');
+        $I->fillField('#templatefields-html', '<p>HTML for Drop Bears</p>');
+        // Disabled as we currently don't set a HTML ID :-/
+        //$I->fillField('#templatefields-textarea', 'What about a textarea');
+        $I->fillField('#templatefields-markdown', '## Some markdown');
+        // Disabled as we currently don't set a HTML ID :-/
+        //$I->fillField('#templatefields-geolocation', 'Prins Hendrikstraat 91');
+        //$I->fillField('#templatefields-video', 'https://www.youtube.com/watch?v=4qlCC1GOwFw');
+        $I->fillField('#field-templatefields-image', '2017-07/vetted-image.jpg');
+        $I->fillField('#templatefields-image-title', 'Known good image');
+        // Disabled as we need to buy HTML for Dummies
+        //$I->fillField('#templatefields-imagelist', '');
+        //$I->fillField('#templatefields-file', '');
+        //$I->fillField('#templatefields-filelist', '');
+        // Disabled as this used only an unpredictable "BUID"
+        //$I->checkOption('#templatefields-checkbox_1', '1');
+        $I->fillField('#templatefields-integer', '42');
+        $I->fillField('#templatefields-float', '4.2');
+        $I->selectOption('#templatefields-select_map', 'home');
+        $I->selectOption('#templatefields-select_list', 'foo');
+        $I->selectOption('#templatefields-select_multi', ['Donatello', 'Rafael']);
+        $I->selectOption('#templatefields-select_record', '1');
+        $I->selectOption('#templatefields-select_record_single', '2');
+        $I->selectOption('#templatefields-select_record_keys', 'contact');
 
-        $I->click('CONTACT PAGE');
-        /*
-         * In v2.0.13 Codeception made the awesome decision to refactor their
-         * PHP Browser code — in a patch release no less — and it doesn't
-         * properly handle URL queries parameters in POSTs. For now we'll just
-         * pretend that seeing the data is good enough…
-         */
-        $I->seeInSource('This is the contact text');
-//         $I->seeInField('#templatefields-section_1', 'This is the contact text');
+        $I->click('Save Page', '#content_edit_save');
+
+        $I->click('Contact Page');
+
+        $I->seeInField('#templatefields-text', 'This is the contact text');
+        $I->seeInField('#templatefields-html', '<p>HTML for Drop Bears</p>');
+        // Disabled as we currently don't set a HTML ID :-/
+        //$I->seeInField('#templatefields-textarea', '');
+        $I->seeInField('#templatefields-markdown', '## Some markdown');
+        // Disabled as we currently don't set a HTML ID :-/
+        //$I->seeInField('#templatefields-geolocation', 'Prins Hendrikstraat 91');
+        //$I->seeInField('#templatefields-video', 'https://www.youtube.com/watch?v=4qlCC1GOwFw');
+        $I->seeInField('#field-templatefields-image', '2017-07/vetted-image.jpg');
+        $I->seeInField('#templatefields-image-title', 'Known good image');
+        $I->seeInField('#templatefields-integer', '42');
+        $I->seeInField('#templatefields-float', '4.2');
+        $I->seeInField('#templatefields-select_map', 'home');
+        $I->seeInField('#templatefields-select_list', 'foo');
+        $I->seeInField('#templatefields-select_multi', 'Donatello');
+        $I->seeInField('#templatefields-select_multi', 'Rafael');
+        $I->seeInField('#templatefields-select_record', '1');
+        $I->seeOptionIsSelected('#templatefields-select_record', '1 / A page I made');
+        $I->seeInField('#templatefields-select_record_single', '2');
+        $I->seeOptionIsSelected('#templatefields-select_record_single', 'About');
+        $I->seeInField('#templatefields-select_record_keys', 'contact');
+        $I->seeOptionIsSelected('#templatefields-select_record_keys', 'Contact Page');
     }
 }

@@ -1,4 +1,5 @@
 <?php
+
 namespace Bolt\Tests\Helper;
 
 use Bolt\Helpers\Html;
@@ -16,11 +17,15 @@ class HtmlTest extends BoltUnitTest
         // Simple text
         $input = 'Lorem ipsum dolor sit amet, consectetur adipisicing elit.';
         $this->assertEquals('Lorem ipsum', Html::trimText($input, 11, false));
-        $this->assertEquals('Lorem ipsum…', Html::trimText($input, 12, true));
+        $this->assertEquals('Lorem ipsum …', Html::trimText($input, 12, true));
 
         // Make sure tags are stripped
         $input = 'Lorem <strong>ipsum</strong> dolor sit amet, consectetur adipisicing elit.';
         $this->assertEquals('Lorem ipsum', Html::trimText($input, 11, false));
+
+        // Make sure long words (more than 10) are capped in the middle
+        $input = 'I suffer from hippopotomonstrosesquipedaliophobia.';
+        $this->assertEquals('I suffer from hippopotomonstrosesquiped…', Html::trimText($input, 40, true));
     }
 
     public function testDecorateTT()
@@ -78,7 +83,7 @@ class HtmlTest extends BoltUnitTest
         );
         $this->assertEquals(
             '',
-            Html::providerLink("foo")
+            Html::providerLink('foo')
         );
         $this->assertEquals(
             '<a href="mailto:supercool@example.org">Supercool Webdesign Co.</a>',
@@ -113,5 +118,4 @@ class HtmlTest extends BoltUnitTest
             Html::providerLink(['http://example.org', '<b malformed HTML'])
         );
     }
-
 }

@@ -1,4 +1,5 @@
 <?php
+
 namespace Bolt\Storage\Repository;
 
 use Bolt\Storage\Entity;
@@ -94,7 +95,10 @@ class UsersRepository extends Repository
         if (is_numeric($userId)) {
             $qb->where('id = :userId');
         } else {
-            $qb->where('username = :userId')->orWhere('email = :userId');
+            $qb
+                ->where($qb->expr()->like('username', ':userId'))
+                ->orWhere('email = :userId')
+            ;
         }
         $qb->setParameter('userId', $userId);
 
@@ -152,50 +156,31 @@ class UsersRepository extends Repository
     }
 
     /**
-     * Check to see if there are users in the user table.
-     *
-     * @return integer
-     */
-    public function hasUsers()
-    {
-        $query = $this->hasUsersQuery();
-
-        return $query->execute()->fetch();
-    }
-
-    /**
-     * @return QueryBuilder
-     */
-    public function hasUsersQuery()
-    {
-        $qb = $this->createQueryBuilder();
-        $qb->select('COUNT(id) as count');
-
-        return $qb;
-    }
-
-    /**
      * Get user based on password reset notification.
+     *
+     * @param string $shadowToken
      *
      * @return Entity\Users|false
      */
-    public function getUserShadowAuth($shadowtoken)
+    public function getUserShadowAuth($shadowToken)
     {
-        $query = $this->getUserShadowAuthQuery($shadowtoken);
+        $query = $this->getUserShadowAuthQuery($shadowToken);
 
         return $this->findOneWith($query);
     }
 
     /**
+     * @param string $shadowToken
+     *
      * @return QueryBuilder
      */
-    public function getUserShadowAuthQuery($shadowtoken)
+    public function getUserShadowAuthQuery($shadowToken)
     {
         $qb = $this->createQueryBuilder();
         $qb->select('*')
             ->where('shadowtoken = :shadowtoken')
             ->andWhere('shadowvalidity > :shadowvalidity')
-            ->setParameter('shadowtoken', $shadowtoken)
+            ->setParameter('shadowtoken', $shadowToken)
             ->setParameter('shadowvalidity', date('Y-m-d H:i:s'));
 
         return $qb;

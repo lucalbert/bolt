@@ -3,47 +3,33 @@
 namespace Bolt\Configuration\Validation;
 
 use Bolt\Config;
-use Bolt\Controller\ExceptionControllerInterface;
+use Bolt\Logger\FlashLoggerInterface;
 
 /**
  * Configuration parameters validation check.
  *
  * @author Gawain Lynch <gawain.lynch@gmail.com>
  */
-class Configuration implements ValidationInterface, ConfigAwareInterface
+class Configuration implements ValidationInterface, ConfigAwareInterface, FlashLoggerAwareInterface
 {
     /** @var Config */
     private $config;
-
-    /**
-     * Constructor.
-     *
-     * @param string $baseName
-     */
-    public function __construct($baseName)
-    {
-        $this->baseName = $baseName;
-    }
+    /** @var FlashLoggerInterface */
+    private $flashLogger;
 
     /**
      * {@inheritdoc}
      */
-    public function check(ExceptionControllerInterface $exceptionController)
+    public function check()
     {
         $exceptions = $this->config->getExceptions();
         if ($exceptions === null) {
             return null;
         }
 
-        return $exceptionController->systemCheck(Validator::CHECK_CONFIG, $exceptions);
-    }
-
-    /**
-     * {@inheritdoc}
-     */
-    public function isTerminal()
-    {
-        return true;
+        foreach ($exceptions as $exception) {
+            $this->flashLogger->error($exception);
+        }
     }
 
     /**
@@ -52,5 +38,13 @@ class Configuration implements ValidationInterface, ConfigAwareInterface
     public function setConfig(Config $config)
     {
         $this->config = $config;
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function setFlashLogger(FlashLoggerInterface $flashLogger)
+    {
+        $this->flashLogger = $flashLogger;
     }
 }

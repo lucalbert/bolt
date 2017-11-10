@@ -1,15 +1,17 @@
 <?php
+
 namespace Bolt\AccessControl;
 
 use Bolt\AccessControl\Token\Token;
 use Bolt\Events\AccessControlEvent;
 use Bolt\Events\AccessControlEvents;
 use Bolt\Exception\AccessControlException;
+use Bolt\Exception\PasswordHashException;
+use Bolt\Exception\PasswordLegacyHashException;
 use Bolt\Storage\Entity;
 use Bolt\Translation\Translator as Trans;
 use Carbon\Carbon;
 use Doctrine\DBAL\Exception\NotNullConstraintViolationException;
-use PasswordLib\Password\Implementation\Blowfish;
 use Silex\Application;
 
 /**
@@ -19,8 +21,10 @@ use Silex\Application;
  */
 class Login extends AccessChecker
 {
-    /** @var \Silex\Application $app */
-    protected $app;
+    /** @var PasswordHashManager */
+    protected $passwordFactory;
+    /** @var string */
+    protected $authTokenName;
 
     /**
      * Constructor.
@@ -29,11 +33,6 @@ class Login extends AccessChecker
      */
     public function __construct(Application $app)
     {
-        /** @var \Bolt\Storage\Repository\AuthtokenRepository $repoAuth */
-        $repoAuth = $app['storage']->getRepository('Bolt\Storage\Entity\Authtoken');
-        /** @var \Bolt\Storage\Repository\UsersRepository $repoUsers */
-        $repoUsers = $app['storage']->getRepository('Bolt\Storage\Entity\Users');
-
         parent::__construct(
             $app['storage.lazy'],
             $app['request_stack'],
@@ -45,8 +44,8 @@ class Login extends AccessChecker
             $app['randomgenerator'],
             $app['access_control.cookie.options']
         );
-
-        $this->app = $app;
+        $this->passwordFactory = $app['password_hash.manager'];
+        $this->authTokenName = $app['token.authentication.name'];
     }
 
     /**
@@ -63,7 +62,7 @@ class Login extends AccessChecker
      */
     public function login($userName, $password, AccessControlEvent $event)
     {
-        $authCookie = $this->requestStack->getCurrentRequest()->cookies->get($this->app['token.authentication.name']);
+        $authCookie = $this->requestStack->getCurrentRequest()->cookies->get($this->authTokenName);
 
         // Remove expired tokens
         $this->getRepositoryAuthtoken()->deleteExpiredTokens();
@@ -90,7 +89,7 @@ class Login extends AccessChecker
     protected function loginCheckPassword($userName, $password, AccessControlEvent $event)
     {
         if (!$userEntity = $this->getUserEntity($userName)) {
-            $this->app['dispatcher']->dispatch(AccessControlEvents::LOGIN_FAILURE, $event->setReason(AccessControlEvents::FAILURE_INVALID));
+            $this->dispatcher->dispatch(AccessControlEvents::LOGIN_FAILURE, $event->setReason(AccessControlEvents::FAILURE_INVALID));
 
             return false;
         }
@@ -99,7 +98,7 @@ class Login extends AccessChecker
         if ($userAuth->getPassword() === null || $userAuth->getPassword() === '') {
             $this->systemLogger->alert("Attempt to login to an account with empty password field: '$userName'", ['event' => 'security']);
             $this->flashLogger->error(Trans::__('general.phrase.login-account-disabled'));
-            $this->app['dispatcher']->dispatch(AccessControlEvents::LOGIN_FAILURE, $event->setReason(AccessControlEvents::FAILURE_DISABLED));
+            $this->dispatcher->dispatch(AccessControlEvents::LOGIN_FAILURE, $event->setReason(AccessControlEvents::FAILURE_DISABLED));
 
             return $this->loginFailed($userEntity);
         }
@@ -107,29 +106,30 @@ class Login extends AccessChecker
         if ((bool) $userEntity->getEnabled() === false) {
             $this->systemLogger->alert("Attempt to login to a disabled account: '$userName'", ['event' => 'security']);
             $this->flashLogger->error(Trans::__('general.phrase.login-account-disabled'));
-            $this->app['dispatcher']->dispatch(AccessControlEvents::LOGIN_FAILURE, $event->setReason(AccessControlEvents::FAILURE_DISABLED));
+            $this->dispatcher->dispatch(AccessControlEvents::LOGIN_FAILURE, $event->setReason(AccessControlEvents::FAILURE_DISABLED));
 
             return $this->loginFailed($userEntity);
         }
 
-        $isValid = $this->app['password_factory']->verifyHash($password, $userAuth->getPassword());
+        try {
+            $isValid = $this->passwordFactory->verifyHash($password, $userAuth->getPassword());
+        } catch (PasswordLegacyHashException $e) {
+            $this->flashLogger->error(Trans::__('general.phrase.login-password-legacy'));
+
+            return false;
+        } catch (PasswordHashException $e) {
+            $this->flashLogger->error(Trans::__('general.phrase.login-password-hash-failure'));
+
+            return false;
+        }
+
         if (!$isValid) {
-            $this->app['dispatcher']->dispatch(AccessControlEvents::LOGIN_FAILURE, $event->setReason(AccessControlEvents::FAILURE_PASSWORD));
+            $this->dispatcher->dispatch(AccessControlEvents::LOGIN_FAILURE, $event->setReason(AccessControlEvents::FAILURE_PASSWORD));
 
             return $this->loginFailed($userEntity);
         }
 
-        // Rehash password if not using Blowfish algorithm
-        if (!Blowfish::detect($userAuth->getPassword())) {
-            $userEntity->setPassword($this->app['password_factory']->createHash($password, '$2y$'));
-            try {
-                $this->getRepositoryUsers()->update($userEntity);
-            } catch (NotNullConstraintViolationException $e) {
-                // Database needs updating
-            }
-        }
-
-        $this->app['dispatcher']->dispatch(AccessControlEvents::LOGIN_SUCCESS, $event->setDispatched());
+        $this->dispatcher->dispatch(AccessControlEvents::LOGIN_SUCCESS, $event->setDispatched());
 
         return $this->loginFinish($userEntity);
     }
@@ -146,15 +146,15 @@ class Login extends AccessChecker
     {
         if (!$userTokenEntity = $this->getRepositoryAuthtoken()->getToken($authCookie, $this->getClientIp(), $this->getClientUserAgent())) {
             $this->flashLogger->error(Trans::__('general.phrase.error-login-invalid-parameters'));
-            $this->app['dispatcher']->dispatch(AccessControlEvents::LOGIN_FAILURE, $event->setReason(AccessControlEvents::FAILURE_INVALID));
+            $this->dispatcher->dispatch(AccessControlEvents::LOGIN_FAILURE, $event->setReason(AccessControlEvents::FAILURE_INVALID));
 
             return false;
         }
 
-        $checksalt = $this->getAuthToken($userTokenEntity->getUsername(), $userTokenEntity->getSalt());
-        if ($checksalt === $userTokenEntity->getToken()) {
-            if (!$userEntity = $this->getUserEntity($userTokenEntity->getUsername())) {
-                $this->app['dispatcher']->dispatch(AccessControlEvents::LOGIN_FAILURE, $event->setReason(AccessControlEvents::FAILURE_INVALID));
+        $checkSalt = $this->getAuthToken($userTokenEntity->getUserId(), $userTokenEntity->getSalt());
+        if ($checkSalt === $userTokenEntity->getToken()) {
+            if (!$userEntity = $this->getUserEntity($userTokenEntity->getUserId())) {
+                $this->dispatcher->dispatch(AccessControlEvents::LOGIN_FAILURE, $event->setReason(AccessControlEvents::FAILURE_INVALID));
 
                 return false;
             }
@@ -164,12 +164,12 @@ class Login extends AccessChecker
             $userTokenEntity->setLastseen(Carbon::now());
             $this->getRepositoryAuthtoken()->save($userTokenEntity);
             $this->flashLogger->success(Trans::__('general.phrase.session-resumed-colon'));
-            $this->app['dispatcher']->dispatch(AccessControlEvents::LOGIN_SUCCESS, $event->setDispatched());
+            $this->dispatcher->dispatch(AccessControlEvents::LOGIN_SUCCESS, $event->setDispatched());
 
             return $this->loginFinish($userEntity);
         }
 
-        $this->app['dispatcher']->dispatch(AccessControlEvents::LOGIN_FAILURE, $event->setReason(AccessControlEvents::FAILURE_INVALID));
+        $this->dispatcher->dispatch(AccessControlEvents::LOGIN_FAILURE, $event->setReason(AccessControlEvents::FAILURE_INVALID));
         $this->systemLogger->alert(sprintf('Attempt to login with an invalid token from %s', $this->getClientIp()), ['event' => 'security']);
 
         return false;
@@ -185,7 +185,7 @@ class Login extends AccessChecker
     protected function getUserEntity($userName)
     {
         if (!$userEntity = $this->getRepositoryUsers()->getUser($userName)) {
-            $this->flashLogger->error(Trans::__('general.phrase.login-account-disabled'));
+            $this->flashLogger->error(Trans::__('general.phrase.error-user-name-password-incorrect'));
 
             return null;
         }
@@ -298,22 +298,25 @@ class Login extends AccessChecker
      *
      * @param Entity\Users $userEntity
      *
+     * @throws DriverException
+     *
      * @return Entity\Authtoken
      */
-    protected function updateAuthToken($userEntity)
+    protected function updateAuthToken(Entity\Users $userEntity)
     {
-        $username = $userEntity->getUsername();
+        $userName = $userEntity->getUsername();
         $cookieLifetime = (integer) $this->cookieOptions['lifetime'];
-        $tokenEntity = $this->getRepositoryAuthtoken()->getUserToken($userEntity->getUsername(), $this->getClientIp(), $this->getClientUserAgent());
+        $repo = $this->getRepositoryAuthtoken();
+        $tokenEntity = $repo->getUserToken($userEntity->getId(), $this->getClientIp(), $this->getClientUserAgent());
 
         if ($tokenEntity) {
             $token = $tokenEntity->getToken();
         } else {
             $salt = $this->randomGenerator->generateString(32);
-            $token = $this->getAuthToken($username, $salt);
+            $token = $this->getAuthToken($userEntity->getId(), $salt);
 
             $tokenEntity = new Entity\Authtoken();
-            $tokenEntity->setUsername($userEntity->getUsername());
+            $tokenEntity->setUserId($userEntity->getId());
             $tokenEntity->setToken($token);
             $tokenEntity->setSalt($salt);
         }
@@ -322,10 +325,9 @@ class Login extends AccessChecker
         $tokenEntity->setIp($this->getClientIp());
         $tokenEntity->setLastseen(Carbon::now());
         $tokenEntity->setUseragent($this->getClientUserAgent());
-
         $this->getRepositoryAuthtoken()->save($tokenEntity);
 
-        $this->systemLogger->debug("Saving new login token '$token' for user ID '$username'", ['event' => 'authentication']);
+        $this->systemLogger->debug("Saving new login token '$token' for user ID '$userName'", ['event' => 'authentication']);
 
         return $tokenEntity;
     }
@@ -348,10 +350,9 @@ class Login extends AccessChecker
     {
         if ($attempts < 5) {
             return null;
-        } else {
-            $wait = pow(($attempts - 4), 2);
-
-            return Carbon::create()->addSeconds($wait);
         }
+        $wait = pow(($attempts - 4), 2);
+
+        return Carbon::create()->addSeconds($wait);
     }
 }

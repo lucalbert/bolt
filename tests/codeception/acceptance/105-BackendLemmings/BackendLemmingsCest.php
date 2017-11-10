@@ -2,7 +2,7 @@
 
 
 /**
- * Backend 'lemmings' test(s)
+ * Backend 'lemmings' test(s).
  *
  * @author Gawain Lynch <gawain.lynch@gmail.com>
  */
@@ -44,13 +44,11 @@ class BackendLemmingsCest extends AbstractAcceptanceTest
 
         $yaml = $I->getLemmingsPermissions();
 
-        $I->fillField('#form_contents', $yaml);
+        $I->fillField('#file_edit_contents', $yaml);
 
-        $token = $I->grabValueFrom('#form__token');
-        $I->sendAjaxPostRequest('/bolt/file/edit/config/permissions.yml', [
-            'form[_token]'   => $token,
-            'form[contents]' => $yaml,
-        ]);
+        $I->click('Save', '#file_edit_save');
+
+        $I->reloadApp();
 
         // Verify we go to the dashboard and end up on the homepage
         $I->amOnPage('/bolt');

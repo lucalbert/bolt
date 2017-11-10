@@ -1,11 +1,14 @@
 <?php
+
 namespace Bolt\Asset\File;
 
 use Bolt\Asset\AssetSortTrait;
 use Bolt\Asset\Injector;
 use Bolt\Asset\QueueInterface;
 use Bolt\Asset\Target;
+use Bolt\Config;
 use Bolt\Controller\Zone;
+use InvalidArgumentException;
 use Symfony\Component\Asset\Packages;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -24,6 +27,8 @@ class Queue implements QueueInterface
     protected $injector;
     /** @var Packages */
     protected $packages;
+    /** @var Config */
+    protected $config;
 
     /** @var FileAssetInterface[] */
     private $stylesheet = [];
@@ -35,11 +40,13 @@ class Queue implements QueueInterface
      *
      * @param Injector $injector
      * @param Packages $packages
+     * @param Config   $config
      */
-    public function __construct(Injector $injector, Packages $packages)
+    public function __construct(Injector $injector, Packages $packages, Config $config)
     {
         $this->injector = $injector;
         $this->packages = $packages;
+        $this->config = $config;
     }
 
     /**
@@ -47,10 +54,17 @@ class Queue implements QueueInterface
      *
      * @param FileAssetInterface $asset
      *
-     * @throws \InvalidArgumentException
+     * @throws InvalidArgumentException
      */
     public function add(FileAssetInterface $asset)
     {
+        if (!$asset->getPackageName()) {
+            throw new InvalidArgumentException(sprintf(
+                'File asset with path "%s" was added to the queue without an asset package specified.',
+                $asset->getPath()
+            ));
+        }
+
         $url = $this->packages->getUrl($asset->getPath(), $asset->getPackageName());
         $asset->setUrl($url);
 
@@ -59,7 +73,7 @@ class Queue implements QueueInterface
         } elseif ($asset->getType() === 'stylesheet') {
             $this->stylesheet[$url] = $asset;
         } else {
-            throw new \InvalidArgumentException(sprintf('Requested asset type %s is not valid.', $asset->getType()));
+            throw new InvalidArgumentException(sprintf('Requested asset type %s is not valid.', $asset->getType()));
         }
     }
 
@@ -70,6 +84,9 @@ class Queue implements QueueInterface
      */
     public function process(Request $request, Response $response)
     {
+        // Conditionally add jQuery
+        $this->addJquery($request, $response);
+
         /** @var FileAssetInterface $asset */
         foreach ($this->sort($this->javascript) as $key => $asset) {
             $this->processAsset($asset, $request, $response);
@@ -127,5 +144,43 @@ class Queue implements QueueInterface
         }
 
         $this->injector->inject($asset, $location, $response);
+    }
+
+    /**
+     * Insert jQuery, if it's not inserted already.
+     *
+     * Some of the patterns that 'match' are:
+     * - jquery.js
+     * - jquery.min.js
+     * - jquery-latest.js
+     * - jquery-latest.min.js
+     * - jquery-1.8.2.min.js
+     * - jquery-1.5.js
+     *
+     * @param Request  $request
+     * @param Response $response
+     */
+    protected function addJquery(Request $request, Response $response)
+    {
+        if (!$this->config->get('general/add_jquery', false) &&
+            !$this->config->get('theme/add_jquery', false)) {
+            return;
+        }
+
+        // Check zone to skip expensive regex
+        if (Zone::isFrontend($request) === false) {
+            return;
+        }
+
+        $html = $response->getContent();
+        $regex = '/<script(.*)jquery(-latest|-[0-9\.]*)?(\.min)?\.js/';
+        if (preg_match($regex, $html)) {
+            return;
+        }
+
+        $this->add(
+            (new JavaScript('js/jquery-2.2.4.min.js', 'bolt'))
+                ->setLocation(Target::BEFORE_JS)
+        );
     }
 }

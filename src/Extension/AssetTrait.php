@@ -7,7 +7,7 @@ use Bolt\Asset\File\FileAssetInterface;
 use Bolt\Asset\Snippet\SnippetAssetInterface;
 use Bolt\Asset\Widget\WidgetAssetInterface;
 use Bolt\Filesystem\Handler\DirectoryInterface;
-use Pimple as Container;
+use Pimple\Container;
 use Silex\Application;
 
 /**
@@ -36,66 +36,64 @@ trait AssetTrait
      * Call this in register method.
      *
      * @internal
+     *
+     * @throws \InvalidArgumentException
      */
     final protected function extendAssetServices()
     {
         /** @var Application $app */
         $app = $this->getContainer();
 
-        $app['asset.queue.file'] = $app->share(
-            $app->extend(
-                'asset.queue.file',
-                function ($queue) {
-                    $this->loadAssets();
+        $app['asset.queue.file'] = $app->extend(
+            'asset.queue.file',
+            function ($queue) {
+                $this->loadAssets();
 
-                    foreach ($this->assets as $asset) {
-                        if ($asset instanceof FileAssetInterface) {
-                            $queue->add($asset);
-                        }
+                foreach ($this->assets as $asset) {
+                    if ($asset instanceof FileAssetInterface) {
+                        $queue->add($asset);
                     }
-
-                    return $queue;
                 }
-            )
+
+                return $queue;
+            }
         );
 
-        $app['asset.queue.snippet'] = $app->share(
-            $app->extend(
-                'asset.queue.snippet',
-                function ($queue) {
-                    $this->loadAssets();
+        $app['asset.queue.snippet'] = $app->extend(
+            'asset.queue.snippet',
+            function ($queue) {
+                $this->loadAssets();
 
-                    foreach ($this->assets as $asset) {
-                        if ($asset instanceof SnippetAssetInterface) {
-                            $queue->add($asset);
-                        }
+                foreach ($this->assets as $asset) {
+                    if ($asset instanceof SnippetAssetInterface) {
+                        $queue->add($asset);
                     }
-
-                    return $queue;
                 }
-            )
+
+                return $queue;
+            }
         );
 
-        $app['asset.queue.widget'] = $app->share(
-            $app->extend(
-                'asset.queue.widget',
-                function ($queue) {
-                    $this->loadAssets();
+        $app['asset.queue.widget'] = $app->extend(
+            'asset.queue.widget',
+            function ($queue) {
+                $this->loadAssets();
 
-                    foreach ($this->assets as $asset) {
-                        if ($asset instanceof WidgetAssetInterface) {
-                            $queue->add($asset);
-                        }
+                foreach ($this->assets as $asset) {
+                    if ($asset instanceof WidgetAssetInterface) {
+                        $queue->add($asset);
                     }
-
-                    return $queue;
                 }
-            )
+
+                return $queue;
+            }
         );
     }
 
     /**
      * Merges assets returned from registerAssets() to our list.
+     *
+     * @throws \InvalidArgumentException
      */
     private function loadAssets()
     {
@@ -107,7 +105,7 @@ trait AssetTrait
             if (!$asset instanceof AssetInterface) {
                 throw new \InvalidArgumentException(sprintf(
                     '%s::registerAssets() should return a list of Bolt\Asset\AssetInterface objects. Got: %s',
-                    get_called_class(),
+                    static::class,
                     is_object($asset) ? get_class($asset) : gettype($asset)
                 ));
             }
@@ -130,25 +128,6 @@ trait AssetTrait
         }
         $this->assets[] = $asset;
     }
-    /**
-     * Add jQuery to the output.
-     *
-     * @deprecated Deprecated since 3.0, to be removed in 4.0.
-     */
-    protected function addJquery()
-    {
-        $this->getContainer()['config']->set('general/add_jquery', true);
-    }
-
-    /**
-     * Don't add jQuery to the output.
-     *
-     * @deprecated Deprecated since 3.0, to be removed in 4.0.
-     */
-    protected function disableJquery()
-    {
-        $this->getContainer()['config']->set('general/add_jquery', false);
-    }
 
     /**
      * Normalizes the path and package name of the asset file.
@@ -162,8 +141,15 @@ trait AssetTrait
             throw new \RuntimeException('Extension file assets must have a path set.');
         }
 
-        // Any external resource does not need further normalisation
-        if (parse_url($path, PHP_URL_HOST) !== null) {
+        if ($asset->getPackageName()) {
+            return;
+        }
+
+        if ($this->isAbsoluteUrl($path)) {
+            // Set asset to a package, since there is no default.
+            // It doesn't matter which since it is absolute.
+            $asset->setPackageName('extensions');
+
             return;
         }
 
@@ -175,20 +161,44 @@ trait AssetTrait
         }
 
         $app = $this->getContainer();
+        $filesystem = $app['filesystem'];
 
-        if ($app['filesystem']->has(sprintf('theme://%s', $path))) {
-            $asset->setPackageName('theme')->setPath($path);
+        $publicFile = $filesystem->getFile("web://$path");
+        if ($publicFile->exists()) {
+            $asset->setPackageName('web');
+
+            return;
+        }
+
+        $themeFile = $filesystem->getFile("theme://$path");
+        if ($themeFile->exists()) {
+            $asset->setPackageName('theme');
 
             return;
         }
 
         $message = sprintf(
-            "Couldn't add file asset '%s': File does not exist in either %s or %s directories.",
-            $path,
-            $this->getWebDirectory()->getFullPath(),
-            $app['resources']->getUrl('theme')
+            "Couldn't add file asset '%s': File does not exist in %s, %s or %s directories. Make sure the file " .
+            'exists in one of these locations, by placing the file there manually (for Bundled Extensions) or by ' .
+            'uninstalling and reinstalling the extension again (for Managed Extensions).',
+            $asset->getPath(),
+            $file->getFullPath(),
+            $publicFile->getFullPath(),
+            $themeFile->getFullPath()
         );
         $app['logger.system']->error($message, ['event' => 'extensions']);
+    }
+
+    /**
+     * @see \Symfony\Component\Asset\Package::isAbsoluteUrl
+     *
+     * @param string $url
+     *
+     * @return bool
+     */
+    private function isAbsoluteUrl($url)
+    {
+        return false !== strpos($url, '://') || '//' === substr($url, 0, 2);
     }
 
     /** @return Container */

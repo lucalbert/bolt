@@ -3,12 +3,15 @@
 namespace Bolt\Storage\ContentRequest;
 
 use Bolt\Config;
-use Bolt\Filesystem\Exception\IOException;
 use Bolt\Filesystem\Manager;
+use Bolt\Form\Resolver;
 use Bolt\Logger\FlashLoggerInterface;
 use Bolt\Storage\Entity\Content;
+use Bolt\Storage\Entity\Relations;
 use Bolt\Storage\Entity\TemplateFields;
 use Bolt\Storage\EntityManager;
+use Bolt\Storage\Mapping\ContentType;
+use Bolt\Storage\Query\Query;
 use Bolt\Storage\Repository;
 use Bolt\Translation\Translator as Trans;
 use Bolt\Users;
@@ -26,6 +29,8 @@ class Edit
 {
     /** @var EntityManager */
     protected $em;
+    /** @var Query */
+    private $query;
     /** @var Config */
     protected $config;
     /** @var Users */
@@ -64,15 +69,27 @@ class Edit
     }
 
     /**
+     * @internal DO NOT USE.
+     *
+     * @deprecated Temporary and to be removed circa 3.5.
+     *
+     * @param Query $query
+     */
+    public function setQueryHandler(Query $query)
+    {
+        $this->query = $query;
+    }
+
+    /**
      * Do the edit form for a record.
      *
-     * @param Content $content     A content record
-     * @param array   $contentType The contenttype data
-     * @param boolean $duplicate   If TRUE create a duplicate record
+     * @param Content     $content     A content record
+     * @param ContentType $contentType The ContentType data
+     * @param boolean     $duplicate   If TRUE create a duplicate record
      *
      * @return array
      */
-    public function action(Content $content, array $contentType, $duplicate)
+    public function action(Content $content, ContentType $contentType, $duplicate)
     {
         $contentTypeSlug = $contentType['slug'];
         $new = $content->getId() === null ?: false;
@@ -111,7 +128,10 @@ class Edit
 
         // Build list of incoming non inverted related records.
         $incomingNotInverted = [];
+        $count = 0;
+        $limit = $this->config->get('general/compatibility/incoming_relations_limit', false);
         foreach ($content->getRelation()->incoming($content) as $relation) {
+            /** @var Relations $relation */
             if ($relation->isInverted()) {
                 continue;
             }
@@ -121,14 +141,29 @@ class Edit
             if ($record) {
                 $incomingNotInverted[$fromContentType][] = $record;
             }
+
+            // Do not try to load more than X records or db will fail
+            ++$count;
+            if ($limit && $count > $limit) {
+                break;
+            }
         }
 
-        // Test write access for uploadable fields.
-        $contentType['fields'] = $this->setCanUpload($contentType['fields']);
-        $templateFields = $content->getTemplatefields();
-        if ($templateFields instanceof TemplateFields && $templateFieldsData = $templateFields->getContenttype()->getFields()) {
-            $templateFields->getContenttype()['fields'] = $this->setCanUpload($templateFields->getContenttype()->getFields());
+        /** @var Content $templateFieldsEntity */
+        $templateFieldsEntity = $content->getTemplatefields();
+        $templateFields = [];
+        if ($templateFieldsEntity instanceof TemplateFields) {
+            /** @var ContentType $templateFieldsContentType */
+            $templateFieldsContentType = $templateFieldsEntity->getContenttype();
+            $templateFields = $templateFieldsContentType->getFields();
+            $templateFieldsContentType['fields'] = $templateFields;
         }
+
+        // Temporary choice option resolver. Will be removed with Forms work circa Bolt 3.5.
+        $choiceResolver = new Resolver\Choice($this->query);
+
+        // Intersect the set taxonomies with actually existing ones, because bogus ones are just confusing.
+        $existingTaxonomies = array_intersect(array_keys($this->config->get('taxonomy')), (array) $contentType['taxonomy']);
 
         // Build context for Twig.
         $contextCan = [
@@ -140,28 +175,31 @@ class Edit
         $contextHas = [
             'incoming_relations' => count($incomingNotInverted) > 0,
             'relations'          => isset($contentType['relations']),
-            'tabs'               => $contentType['groups'] !== false,
-            'taxonomy'           => isset($contentType['taxonomy']),
-            'templatefields'     => empty($templateFieldsData) ? false : true,
+            'tabs'               => $contentType['groups'] !== [],
+            'taxonomy'           => $existingTaxonomies !== [],
+            'templatefields'     => count($templateFields) > 0,
         ];
         $contextValues = [
             'datepublish'        => $this->getPublishingDate($content->getDatepublish(), true),
             'datedepublish'      => $this->getPublishingDate($content->getDatedepublish()),
+            'select_choices'     => $choiceResolver->get($contentType, (array) $templateFields),
         ];
         $context = [
-            'incoming_not_inv'   => $incomingNotInverted,
-            'contenttype'        => $contentType,
-            'content'            => $content,
-            'allowed_status'     => $allowedStatuses,
-            'contentowner'       => $contentowner,
-            'fields'             => $this->config->fields->fields(),
-            'fieldtemplates'     => $this->getTemplateFieldTemplates($contentType, $content),
-            'fieldtypes'         => $this->getUsedFieldtypes($contentType, $content, $contextHas),
-            'groups'             => $this->createGroupTabs($contentType, $contextHas),
-            'can'                => $contextCan,
-            'has'                => $contextHas,
-            'values'             => $contextValues,
-            'relations_list'     => $this->getRelationsList($contentType),
+            'incoming_not_inv' => $incomingNotInverted,
+            'contenttype'      => $contentType,
+            'content'          => $content,
+            'allowed_status'   => $allowedStatuses,
+            'contentowner'     => $contentowner,
+            'duplicate'        => $duplicate,
+            'fields'           => $this->config->fields->fields(),
+            'fieldtemplates'   => $this->getTemplateFieldTemplates($contentType, $content),
+            'fieldtypes'       => $this->getUsedFieldtypes($contentType, $content, $contextHas),
+            'templatefields'   => $templateFields,
+            'groups'           => $this->createGroupTabs($contentType, $contextHas),
+            'can'              => $contextCan,
+            'has'              => $contextHas,
+            'values'           => $contextValues,
+            'relations_list'   => $this->getRelationsList($contentType),
         ];
 
         return $context;
@@ -171,11 +209,11 @@ class Edit
      * Convert POST relationship values to an array of Entity objects keyed by
      * ContentType.
      *
-     * @param array $contentType
+     * @param ContentType $contentType
      *
      * @return array
      */
-    private function getRelationsList(array $contentType)
+    private function getRelationsList(ContentType $contentType)
     {
         $list = [];
         if (!isset($contentType['relations']) || !is_array($contentType['relations'])) {
@@ -187,8 +225,9 @@ class Edit
             $repo = $this->em->getRepository($relationName);
             $relationConfig = $this->config->get('contenttypes/' . $relationName, []);
             $neededFields = $this->neededFields($relationValues, $relationConfig);
+            $order = isset($relationValues['order']) ? $relationValues['order'] : null;
 
-            $list[$relationName] = $repo->getSelectList($relationConfig, $relationValues['order'], $neededFields);
+            $list[$relationName] = $repo->getSelectList($relationConfig, $order, $neededFields);
         }
 
         return $list;
@@ -206,75 +245,27 @@ class Edit
     {
         $fields = [];
 
-        // Regex the 'format' for things that look like 'item.foo', and intersect with the actual fields in the contenttype.
+        // Get the field names from the ContentType, including 'status'.
+        $fieldNames = array_merge(array_keys($relationConfig['fields']), ['status']);
+
+        // Regex the 'format' for things that look like 'item.foo', and intersect with the field names.
         if (!empty($relationValues['format'])) {
             preg_match_all('/\bitem\.([a-z0-9_]+)\b/i', $relationValues['format'], $matches);
-            $fields = array_intersect($matches[1], array_keys($relationConfig['fields']));
+            $fields = array_intersect($matches[1], $fieldNames);
         }
 
         return $fields;
-    }
-
-    /**
-     * Determine write access for upload fields, and auto-create the desired directory if it does not exist.
-     *
-     * Note that in cases where an array is passed then true will be set if at least some of the directories can
-     * be written to.
-     *
-     * @param array $fields
-     *
-     * @return array
-     */
-    private function setCanUpload($fields)
-    {
-        $can = false;
-        foreach ($fields as &$values) {
-            if (isset($values['upload'])) {
-                foreach ((array) $values['upload'] as $path) {
-                    $can = $can || $this->checkUploadDirectory($path);
-                }
-                $values['canUpload'] = $can;
-            } else {
-                $values['canUpload'] = true;
-            }
-        }
-
-        return $fields;
-    }
-
-    /**
-     * Check a given upload path to see if it is 'public' or 'private' access, create if required.
-     *
-     * @param $path
-     *
-     * @return boolean
-     */
-    private function checkUploadDirectory($path)
-    {
-        if (strpos('://', $path) === false) {
-            $path = sprintf('files://%s', $path);
-        }
-        if ($this->filesystem->has($path)) {
-            return $this->filesystem->getVisibility($path) === 'public';
-        }
-        try {
-            $this->filesystem->createDir($path);
-
-            return $this->filesystem->getVisibility($path) === 'public';
-        } catch (IOException $e) {
-            return false;
-        }
     }
 
     /**
      * Determine which templates will result in templatefields.
      *
-     * @param array   $contentType
-     * @param Content $content
+     * @param ContentType $contentType
+     * @param Content     $content
      *
      * @return array
      */
-    private function getTemplateFieldTemplates(array $contentType, Content $content)
+    private function getTemplateFieldTemplates(ContentType $contentType, Content $content)
     {
         $templateFieldTemplates = [];
         $templateFieldsConfig = $this->config->get('theme/templatefields');
@@ -315,20 +306,20 @@ class Edit
             return date('Y-m-d H:i:s');
         } elseif ($date === '1900-01-01 00:00:00') {
             return '';
-        } else {
-            return $date;
         }
+
+        return $date;
     }
 
     /**
      * Generate tab groups.
      *
-     * @param array $contentType
-     * @param array $has
+     * @param ContentType $contentType
+     * @param array       $has
      *
      * @return array
      */
-    private function createGroupTabs(array $contentType, array $has)
+    private function createGroupTabs(ContentType $contentType, array $has)
     {
         $groups = [];
         $groupIds = [];
@@ -348,7 +339,7 @@ class Edit
             $groupIds[$id] = 1;
         };
 
-        foreach ($contentType['groups'] ? $contentType['groups'] : ['ungrouped'] as $group) {
+        foreach ($contentType['groups'] ?: ['ungrouped'] as $group) {
             if ($group === 'ungrouped') {
                 $addGroup($group, Trans::__('contenttypes.generic.group.ungrouped'));
             } elseif ($group !== 'meta' && $group !== 'relations' && $group !== 'taxonomy') {
@@ -387,13 +378,13 @@ class Edit
     /**
      * Create a list of fields types used in regular, template and virtual fields.
      *
-     * @param array   $contentType
-     * @param Content $content
-     * @param array   $has
+     * @param ContentType $contentType
+     * @param Content     $content
+     * @param array       $has
      *
      * @return array
      */
-    private function getUsedFieldtypes(array $contentType, Content $content, array $has)
+    private function getUsedFieldtypes(ContentType $contentType, Content $content, array $has)
     {
         $fieldtypes = [
             'meta' => true,
@@ -408,10 +399,17 @@ class Edit
         foreach ([$contentType['fields'], $templateFields] as $fields) {
             foreach ($fields as $field) {
                 $fieldtypes[$field['type']] = true;
+                if ($field['type'] === 'repeater') {
+                    foreach ($field['fields'] as $rfield) {
+                        $fieldtypes[$rfield['type']] = true;
+                    }
+                }
             }
-            if ($field['type'] === 'repeater') {
-                foreach ($field['fields'] as $rfield) {
-                    $fieldtypes[$rfield['type']] = true;
+            if ($field['type'] === 'block') {
+                foreach ($field['fields'] as $block) {
+                    foreach ($block['fields'] as $rfield) {
+                        $fieldtypes[$rfield['type']] = true;
+                    }
                 }
             }
         }

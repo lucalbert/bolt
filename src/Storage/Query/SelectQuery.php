@@ -2,6 +2,7 @@
 
 namespace Bolt\Storage\Query;
 
+use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Query\Expression\CompositeExpression;
 use Doctrine\DBAL\Query\QueryBuilder;
 
@@ -9,7 +10,7 @@ use Doctrine\DBAL\Query\QueryBuilder;
  *  This query class coordinates a select query build from Bolt's
  *  custom query DSL as documented here:.
  *
- *  @link https://docs.bolt.cm/templates/content-fetching
+ *  @see https://docs.bolt.cm/templates/content-fetching
  *
  *  The resulting QueryBuilder object is then passed through to the individual
  *  field handlers where they can perform value transformations.
@@ -18,12 +19,18 @@ use Doctrine\DBAL\Query\QueryBuilder;
  */
 class SelectQuery implements QueryInterface
 {
+    /** @var QueryBuilder */
     protected $qb;
+    /** @var QueryParameterParser */
     protected $parser;
-    protected $contenttype;
+    /** @var string */
+    protected $contentType;
+    /** @var array */
     protected $params;
+    /** @var Filter[] */
     protected $filters = [];
     protected $replacements = [];
+    /** @var bool */
     protected $singleFetchMode = false;
 
     /**
@@ -39,23 +46,61 @@ class SelectQuery implements QueryInterface
     }
 
     /**
-     * Sets the contenttype that this query will run against.
+     * Sets the ContentType that this query will run against.
      *
      * @param string $contentType
      */
     public function setContentType($contentType)
     {
-        $this->contenttype = $contentType;
+        $this->contentType = $contentType;
     }
 
     /**
-     * Sets the parameters that will filter / alter the query
+     * Gets the ContentType that this query will run against.
+     *
+     * @return string
+     */
+    public function getContentType()
+    {
+        return $this->contentType;
+    }
+
+    /**
+     * Sets the parameters that will filter / alter the query.
      *
      * @param array $params
      */
     public function setParameters(array $params)
     {
         $this->params = array_filter($params);
+        $this->processFilters();
+    }
+
+    /**
+     * Getter to allow access to a set parameter.
+     *
+     * @param $name
+     *
+     * @return array|null
+     */
+    public function getParameter($name)
+    {
+        if (array_key_exists($name, $this->params)) {
+            return $this->params[$name];
+        }
+
+        return null;
+    }
+
+    /**
+     * Setter to allow writing to a named parameter.
+     *
+     * @param string $name
+     * @param mixed  $value
+     */
+    public function setParameter($name, $value)
+    {
+        $this->params[$name] = $value;
         $this->processFilters();
     }
 
@@ -109,11 +154,17 @@ class SelectQuery implements QueryInterface
         );
     }
 
-    public function setWhereParameter($key, $val)
+    /**
+     * Sets all the parameters for a specific field name.
+     *
+     * @param string $key
+     * @param mixed  $value
+     */
+    public function setWhereParameter($key, $value)
     {
         foreach ($this->filters as $filter) {
             if ($filter->hasParameter($key)) {
-                $filter->setParameter($key, $val);
+                $filter->setParameter($key, $value);
             }
         }
     }
@@ -127,7 +178,7 @@ class SelectQuery implements QueryInterface
     }
 
     /**
-     * Returns all the filters attached to the query
+     * Returns all the filters attached to the query.
      *
      * @return Filter[]
      */
@@ -150,13 +201,15 @@ class SelectQuery implements QueryInterface
         if ($this->getWhereExpression()) {
             $query->where($this->getWhereExpression());
         }
-        $query->setParameters($this->getWhereParameters());
+        foreach ($this->getWhereParameters() as $key => $param) {
+            $query->setParameter($key, $param, (is_array($param)) ? Connection::PARAM_STR_ARRAY : null);
+        }
 
         return $query;
     }
 
     /**
-     * Allows public access to the QueryBuilder object
+     * Allows public access to the QueryBuilder object.
      *
      * @return QueryBuilder
      */
@@ -166,9 +219,9 @@ class SelectQuery implements QueryInterface
     }
 
     /**
-     * Allows replacing the default querybuilder
+     * Allows replacing the default QueryBuilder.
      *
-     * @return QueryBuilder
+     * @param QueryBuilder $qb
      */
     public function setQueryBuilder(QueryBuilder $qb)
     {
@@ -176,7 +229,7 @@ class SelectQuery implements QueryInterface
     }
 
     /**
-     * Returns wether the query is in single fetch mode.
+     * Returns whether the query is in single fetch mode.
      *
      * @return bool
      */
@@ -207,16 +260,18 @@ class SelectQuery implements QueryInterface
 
     /**
      * Internal method that runs the individual key/value input through
-     * the QueryParamtererParser. This allows complicated expressions to
-     * be turned into simple sql expressions
-     *
-     * @return void
+     * the QueryParameterParser. This allows complicated expressions to
+     * be turned into simple sql expressions.
      */
     protected function processFilters()
     {
+        $this->filters = [];
         foreach ($this->params as $key => $value) {
-            $this->parser->setAlias($this->contenttype);
-            $this->addFilter($this->parser->getFilter($key, $value));
+            $this->parser->setAlias('_' . $this->contentType);
+            $filter = $this->parser->getFilter($key, $value);
+            if ($filter) {
+                $this->addFilter($filter);
+            }
         }
     }
 }

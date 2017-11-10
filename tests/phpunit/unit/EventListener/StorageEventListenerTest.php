@@ -2,21 +2,23 @@
 
 namespace Bolt\Tests\EventListener;
 
+use Bolt\AccessControl\PasswordHashManager;
 use Bolt\EventListener\StorageEventListener;
 use Bolt\Events\StorageEvent;
 use Bolt\Logger\FlashLoggerInterface;
 use Bolt\Storage\Database\Schema\SchemaManagerInterface;
 use Bolt\Storage\Entity\Users;
+use Bolt\Storage\EntityManager;
 use Bolt\Storage\EventProcessor\TimedRecord;
-use PasswordLib\Password\Factory as PasswordFactory;
-use PasswordLib\Password\Implementation\Blowfish;
-use Prophecy\Argument;
+use PHPUnit\Framework\TestCase;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 
-class StorageEventListenerTest extends \PHPUnit_Framework_TestCase
+class StorageEventListenerTest extends TestCase
 {
     /** @var Users */
     private $user;
+    /** @var EntityManager */
+    private $em;
     /** @var TimedRecord */
     private $timedRecord;
     /** @var SchemaManagerInterface */
@@ -25,8 +27,8 @@ class StorageEventListenerTest extends \PHPUnit_Framework_TestCase
     private $urlGenerator;
     /** @var FlashLoggerInterface */
     private $flashLogger;
-    /** @var PasswordFactory */
-    private $passwordFactory;
+    /** @var PasswordHashManager */
+    private $passwordHash;
     /** @var StorageEventListener */
     private $listener;
     /** @var StorageEvent */
@@ -36,37 +38,25 @@ class StorageEventListenerTest extends \PHPUnit_Framework_TestCase
     {
         $this->user = $this->prophesize(Users::class);
 
+        $this->em = $this->prophesize(EntityManager::class);
         $this->timedRecord = $this->prophesize(TimedRecord::class);
         $this->schemaManager = $this->prophesize(SchemaManagerInterface::class);
         $this->urlGenerator = $this->prophesize(UrlGeneratorInterface::class);
         $this->flashLogger = $this->prophesize(FlashLoggerInterface::class);
-        $this->passwordFactory = $this->prophesize(PasswordFactory::class);
+        $this->passwordHash = $this->prophesize(PasswordHashManager::class);
 
         $this->listener = new StorageEventListener(
+            $this->em->reveal(),
             $this->timedRecord->reveal(),
             $this->schemaManager->reveal(),
-
             $this->urlGenerator->reveal(),
             $this->flashLogger->reveal(),
-            $this->passwordFactory->reveal(),
-            5
+            $this->passwordHash->reveal(),
+            5,
+            false
         );
 
         $this->storageEvent = $this->prophesize(StorageEvent::class);
-    }
-
-    /**
-     * It should throw an exception if the password is shorter than 6 characters.
-     *
-     * @expectedException \Bolt\Exception\AccessControlException
-     * @expectedExceptionMessage Can not save a password with a length shorter than 6 characters!
-     */
-    public function testOnPreSavePasswordTooShort()
-    {
-        $this->user->getPassword()->willReturn('pass');
-        $this->storageEvent->getContent()->willReturn($this->user->reveal());
-
-        $this->listener->onPreSave($this->storageEvent->reveal());
     }
 
     /**
@@ -76,37 +66,9 @@ class StorageEventListenerTest extends \PHPUnit_Framework_TestCase
     {
         $this->storageEvent->getContent()->willReturn($this->user->reveal());
         $this->user->getPassword()->willReturn('password');
-        $this->passwordFactory->createHash('password', Argument::type('string'))->willReturn('hashedpassword');
+        $this->passwordHash->createHash('password')->willReturn('hashedpassword');
         $this->user->setPassword('hashedpassword')->shouldBeCalled();
 
-        $this->listener->onPreSave($this->storageEvent->reveal());
-    }
-
-    /**
-     * It should detect already hashed passwords.
-     *
-     * @dataProvider providePreSaveAlreadyHashed
-     */
-    public function testOnPreSavePasswordAlreadyHashed($hash)
-    {
-        $this->storageEvent->getContent()->willReturn($this->user->reveal());
-        $this->user->getPassword()->willReturn($hash);
-        $this->passwordFactory->createHash(Argument::cetera())->shouldNotBeCalled();
-        $this->user->setPassword($hash)->shouldBeCalled();
-
-        $this->listener->onPreSave($this->storageEvent->reveal());
-    }
-
-    public function providePreSaveAlreadyHashed()
-    {
-        return [
-            [
-                Blowfish::getPrefix() . '07$usesomesillystringfore2uDLvp1Ii2e./U9C8sBjqp8I90dH6hi'
-            ],
-            [
-                '$P$ABCDEFGHIJKLMNOPQRSTUVWXYZ01234',
-            ]
-        ];
-
+        $this->listener->onUserEntityPreSave($this->storageEvent->reveal());
     }
 }

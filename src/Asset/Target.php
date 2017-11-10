@@ -1,4 +1,5 @@
 <?php
+
 namespace Bolt\Asset;
 
 /**
@@ -69,18 +70,4 @@ class Target
     const WIDGET_BACK_LOGIN_TOP                = 'login_top';
     const WIDGET_BACK_LOGIN_MIDDLE             = 'login_middle';
     const WIDGET_BACK_LOGIN_BOTTOM             = 'login_bottom';
-
-    /**
-     * Returns all possible target locations (which are constants).
-     *
-     * @deprecated Deprecated since 3.0, to be removed in 4.0.
-     *
-     * @return array
-     */
-    public function listAll()
-    {
-        $reflection = new \ReflectionClass($this);
-
-        return $reflection->getConstants();
-    }
 }

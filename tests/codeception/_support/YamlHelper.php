@@ -7,14 +7,14 @@ use Symfony\Component\Yaml\Dumper;
 use Symfony\Component\Yaml\Parser;
 
 /**
- * YAML Helper class
+ * YAML Helper class.
  *
  * @author Gawain Lynch <gawain.lynch@gmail.com>
  */
 class YamlHelper extends \Codeception\Module
 {
     /**
-     * Read a YAML file from app/config/
+     * Read a YAML file.
      *
      * @param string $file
      *
@@ -24,24 +24,24 @@ class YamlHelper extends \Codeception\Module
      */
     private function readYaml($file)
     {
-        $filename = INSTALL_ROOT . '/app/config/' . $file;
+        $fileName = INSTALL_ROOT . '/' . $file;
         $parser = new Parser();
 
-        if (is_readable($filename)) {
-            return $parser->parse(file_get_contents($filename) . "\n");
-        } else {
-            throw new IOException($filename . ' is not readable!');
+        if (is_readable($fileName)) {
+            return $parser->parse(file_get_contents($fileName) . "\n");
         }
+
+        throw new IOException($fileName . ' is not readable!');
     }
 
     /**
-     * Read the config file and set 'canonical' and 'notfound'
+     * Read the config file and set 'canonical' and 'notfound'.
      *
      * @return string
      */
     public function getUpdatedConfig()
     {
-        $config = $this->readYaml('config.yml');
+        $config = $this->readYaml('config/config.yml');
 
         $config['canonical'] = 'example.org';
         $config['notfound']  = 'resources/not-found';
@@ -108,11 +108,11 @@ class YamlHelper extends \Codeception\Module
      *             change-ownership: [ ]
      * ```
      *
-     * @return string
+     * @return array
      */
     private function getBasePermissions()
     {
-        $permissions = $this->readYaml('permissions.yml');
+        $permissions = $this->readYaml('config/permissions.yml');
 
         $permissions['contenttype-all'] = [
             'edit'             => ['developer', 'admin', 'chief-editor'],
@@ -120,39 +120,39 @@ class YamlHelper extends \Codeception\Module
             'publish'          => ['developer', 'admin', 'chief-editor'],
             'depublish'        => ['developer', 'admin', 'chief-editor'],
             'delete'           => ['developer', 'admin'],
-            'change-ownership' => ['developer', 'admin']
+            'change-ownership' => ['developer', 'admin'],
         ];
 
         $permissions['contenttype-default'] = [
             'view'             => ['anonymous'],
             'create'           => ['editor'],
             'edit'             => ['editor'],
-            'change-ownership' => ['owner']
+            'change-ownership' => ['owner'],
         ];
 
         $permissions['contenttypes'] = [
             'pages'     => [
                 'create'           => ['editor'],
                 'edit'             => ['editor', 'author'],
-                'change-ownership' => ['owner']
+                'change-ownership' => ['owner'],
             ],
             'entries'   => [
                 'view'             => ['admin'],
-                'create'           => ['admin']
+                'create'           => ['admin'],
             ],
             'showcases' => [
                 'create'           => ['admin'],
                 'edit'             => ['admin', 'editor'],
                 'publish'          => ['admin'],
-                'change-ownership' => []
-            ]
+                'change-ownership' => [],
+            ],
         ];
 
         return $permissions;
     }
 
     /**
-     * Add a 'Resources' Contenttype
+     * Add a 'Resources' Contenttype.
      *
      * ```
      * resources:
@@ -177,11 +177,11 @@ class YamlHelper extends \Codeception\Module
      *
      * @return string
      */
-    public function getUpdatedContenttypes()
+    public function getUpdatedContentTypes()
     {
-        $contenttypes = $this->readYaml('contenttypes.yml');
+        $contentTypes = $this->readYaml('config/contenttypes.yml');
 
-        $contenttypes['resources'] = [
+        $contentTypes['resources'] = [
             'name'          => 'Resources',
             'singular_name' => 'Resource',
             'fields'        => [
@@ -195,16 +195,16 @@ class YamlHelper extends \Codeception\Module
                 ],
                 'body' => [
                     'type'   => 'html',
-                    'height' => '300px'
-                ]
+                    'height' => '300px',
+                ],
             ],
             'default_status'    => 'published',
             'show_on_dashboard' => false,
             'searchable'        => false,
-            'viewless'          => true
+            'viewless'          => true,
         ];
 
-        return $this->getYamlString($contenttypes, 4);
+        return $this->getYamlString($contentTypes, 4);
     }
 
     /**
@@ -214,7 +214,7 @@ class YamlHelper extends \Codeception\Module
      */
     public function getUpdatedTaxonomy()
     {
-        $taxonomy = $this->readYaml('taxonomy.yml');
+        $taxonomy = $this->readYaml('config/taxonomy.yml');
 
         $options = $taxonomy['categories']['options'];
         sort($options);
@@ -224,13 +224,13 @@ class YamlHelper extends \Codeception\Module
     }
 
     /**
-     * Read the menu file and add a menu for the Showcase listing
+     * Read the menu file and add a menu for the Showcase listing.
      *
      * @return string
      */
     public function getUpdatedMenu()
     {
-        $menus = $this->readYaml('menu.yml');
+        $menus = $this->readYaml('config/menu.yml');
 
         $menus['main'][] = ['label' => 'Showcases Listing', 'path' => 'showcases/'];
 
@@ -244,7 +244,7 @@ class YamlHelper extends \Codeception\Module
      */
     public function getUpdatedRouting()
     {
-        $filename = INSTALL_ROOT . '/app/config/routing.yml';
+        $filename = INSTALL_ROOT . '/config/routing.yml';
 
         $routing = [
             'pagebinding:',
@@ -261,18 +261,119 @@ class YamlHelper extends \Codeception\Module
         return implode("\n", $routing);
     }
 
+    public function getUpdatedTheme()
+    {
+        $theme = $this->readYaml('public/theme/base-2016/theme.yml');
+
+        /**
+         * Disabled as currently unsupported due to problems in test due to
+         * |first filter in base-2016:
+         *
+         * @see https://github.com/bolt/bolt/blob/v3.2.16/theme/base-2016/partials/_sub_fields.twig#L104
+         */
+        unset($theme['templatefields']['extrafields.twig']);
+
+        $theme['templatefields']['page.twig'] =   [
+            'text'        => ['type' => 'text'],
+            'html'        => ['type' => 'html'],
+            'textarea'    => ['type' => 'textarea'],
+            'markdown'    => ['type' => 'markdown'],
+            'geolocation' => ['type' => 'geolocation'],
+            'video'       => ['type' => 'video'],
+            'image'       => [
+                'type'       => 'image',
+                'attrib'     => 'title',
+                'extensions' => ['gif', 'jpg', 'png'],
+            ],
+            'imagelist' => ['type' => 'imagelist'],
+            'file'      => ['type' => 'file'],
+            'filelist'  => ['type' => 'filelist'],
+            'checkbox'  => ['type' => 'checkbox'],
+            /**
+             * Disabled as currently unsupported due to bug in persistence
+             */
+            //'date' => [
+            //    'type'    => 'date',
+            //    'default' => 'first day of last month',
+            //],
+            //'datetime'  => [
+            //    'type'    => 'datetime',
+            //    'default' => '2000-01-01',
+            //],
+            'integer' => [
+                'type'  => 'integer',
+                'index' => true,
+            ],
+            'float'      => ['type' => 'float'],
+            'select_map' => [
+                'type'   => 'select',
+                'values' => [
+                    'unknown'  => 'Unknown',
+                    'home'     => 'Home',
+                    'business' => 'Business',
+                ],
+            ],
+            'select_list' => [
+                'type'   => 'select',
+                'values' => ['foo', 'bar', 'baz'],
+            ],
+            'select_multi' => [
+                'type'     => 'select',
+                'values'   => ['A-tuin', 'Donatello', 'Rafael', 'Leonardo', 'Michelangelo', 'Koopa', 'Squirtle'],
+                'multiple' => true,
+            ],
+            'select_record' => [
+                'type'         => 'select',
+                'values'       => 'pages/id,title',
+                'sort'         => 'title',
+            ],
+            'select_record_single' => [
+                'type'         => 'select',
+                'values'       => 'pages/title',
+                'sort'         => 'title',
+            ],
+            'select_record_keys' => [
+                'type'         => 'select',
+                'values'       => 'pages/title',
+                'sort'         => 'title',
+                'keys'         => 'slug',
+            ],
+            /**
+             * Disabled as currently unsupported due to problems in extension
+             * fields, and in test due to |first filter in base-2016:
+             *
+             * @see https://github.com/bolt/bolt/blob/v3.2.16/theme/base-2016/partials/_sub_fields.twig#L104
+             */
+            //'repeater' => [
+            //    'type'   => 'repeater',
+            //    'limit'  => 3,
+            //    'fields' => [
+            //        'repeat_title' => ['type' => 'text'],
+            //        'repeat_image' => [
+            //            'type'       => 'image',
+            //            'extensions' => ['gif', 'jpg', 'png'],
+            //        ],
+            //        'repeat_html' => ['type' => 'html'],
+            //    ],
+            //],
+        ];
+
+        return $this->getYamlString($theme, 6);
+    }
+
     /**
-     * Get the YAML in a string
+     * Get the YAML in a string.
      *
      * @param array   $input  The PHP value
      * @param integer $inline The level where you switch to inline YAML
+     * @param mixed   $depth
      *
      * @return string
      */
-    private function getYamlString(array $yaml, $depth)
+    private function getYamlString(array $input, $inline)
     {
         $dumper = new Dumper();
-        $out = $dumper->dump($yaml, $depth);
+        $out = $dumper->dump($input, $inline);
 
         return str_replace('{  }', '[ ]', $out);
     }

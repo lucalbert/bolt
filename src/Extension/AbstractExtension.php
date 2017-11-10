@@ -2,9 +2,9 @@
 
 namespace Bolt\Extension;
 
+use Bolt\Common\Str;
 use Bolt\Filesystem\Handler\DirectoryInterface;
-use Bolt\Helpers\Str;
-use Pimple as Container;
+use Pimple\Container;
 
 /**
  * Defined some base functionality for extensions.
@@ -117,7 +117,7 @@ abstract class AbstractExtension implements ExtensionInterface
     {
         if ($this->vendor === null) {
             $namespace = $this->getNamespace();
-            $name = Str::replaceFirst('Bolt\\Extension\\', '', $namespace);
+            $name = Str::replaceFirst($namespace, 'Bolt\\Extension\\', '');
             $pos = strpos($name, '\\');
             $this->vendor = $pos === false ? $name : substr($name, 0, $pos);
         }
